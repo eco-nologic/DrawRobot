@@ -58,12 +58,12 @@ void CommsManager::onEvent(AsyncWebSocket* s, AsyncWebSocketClient* c, AwsEventT
             if (strcmp(cmd, "STOP") == 0) { _planner.stop(); drive.stop(); }
 
             // Routage des commandes vers les séquences du PathPlanner
-            if (strcmp(cmd, "stairs") == 0) _planner.startStairs();
-            if (strcmp(cmd, "circle") == 0) _planner.startCircle(doc["radius"] | 50.0f);
-            if (strcmp(cmd, "squares") == 0) _planner.startSquares(doc["size"] | 50.0f, doc["count"] | 3);
-            if (strcmp(cmd, "north") == 0) _planner.startNorthArrow();
-            if (strcmp(cmd, "calibrateMag") == 0) _planner.startCalibrationSequence();
-            if (strcmp(cmd, "stop") == 0) _planner.stop(); 
+            if (strcmp(cmd, "stairs") == 0) { _planner.stop();_planner.startStairs(); }
+            if (strcmp(cmd, "circle") == 0) {_planner.startCircle(doc["radius"] | 50.0f); } 
+            if (strcmp(cmd, "squares") == 0) {_planner.startSquares(doc["size"] | 50.0f, doc["count"] | 3); }
+            if (strcmp(cmd, "north") == 0) { _planner.stop(); _planner.startNorthArrow(); }
+            if (strcmp(cmd, "calibrateMag") == 0) { _planner.stop(); _planner.startCalibrationSequence(); }
+            if (strcmp(cmd, "stop") == 0) { _planner.stop(); drive.stop();}
 
             // --- Nouvelle commande de configuration ---
             if (strcmp(cmd, "config") == 0) {
