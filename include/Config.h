@@ -33,7 +33,11 @@ namespace Config {
     // I2C
     constexpr int SDA = 21;
     constexpr int SCL = 22;
-    constexpr int I2C_FREQ = 400000;
+    constexpr int I2C_FREQ = 100000; // 100kHz (Standard Mode) for better noise immunity
+
+    // IMU I2C addresses (Adafruit defaults)
+    constexpr uint8_t AddrLsm6ds = 0x6A;   // Default for LSM6DSOX/LSM6DS33
+    constexpr uint8_t AddrLis3mdl = 0x1E;  // LIS3MDL (alternate address, often used on breakout boards)
 
     // PWM Config
     constexpr int PWM_FREQ = 5000;
