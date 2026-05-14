@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DrawRobot - ECE Defense</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>DrawRobot Control Tower</h1>
+    <!-- DEFENSE: "Comment visualisez-vous le tracé ?" -->
+    <!-- ANSWER: Via un élément HTML5 Canvas qui dessine les coordonnées (x,y) reçues. -->
+    <canvas id="map" width="500" height="500"></canvas>
+    
+    <div class="controls">
+        <div class="stats">
+            Pose: <span id="pose">0, 0, 0°</span> | 
+            Batt: <span id="batt">0V</span> |
+            Calib: <span id="calibStatus">N/A</span>
+        </div>
+        <hr>
+        <button onclick="sendCmd('stairs')">Séquence 1 (Escalier)</button>
+        <input type="number" id="squareSize" value="50" min="10" max="200" step="10">
+        <input type="number" id="squareCount" value="3" min="1" max="10" step="1">
+        <button onclick="sendSquares()">FA1 (Carrés)</button>
+        <hr>
+        <input type="number" id="circleRadius" value="50" min="20" max="200" step="10">
+        <button onclick="sendCircle()">Séquence 2 (Cercle)</button>
+        <button onclick="sendCmd('north')">Séquence 3 (Nord)</button>
+        <hr>
+        <button onclick="sendCmd('calibrateMag')">Calibrer Magnétomètre</button>
+        <hr>
+        <details>
+            <legend>Réglages PID (Expert)</legend>
+            <div class="pid-grid">
+                Linear: <input type="number" id="lkp" value="0.5" step="0.1"> 
+                <input type="number" id="lki" value="0.1" step="0.01">
+                Angular: <input type="number" id="akp" value="0.8" step="0.1">
+            </div>
+            <button onclick="sendConfig()">Appliquer PID</button>
+        </details>
+        <button id="stopBtn" onclick="sendCmd('stop')">EMERGENCY STOP</button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

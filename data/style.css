@@ -1,0 +1,62 @@
+/* DEFENSE: "Pourquoi une interface web plutôt qu'une application lourde ?" */
+/* ANSWER: Pour la portabilité (standard HTML5/CSS3) et l'absence d'installation sur le PC. */
+body { 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    background: #2c3e50; /* Dark blue background */
+    color: #ecf0f1; /* Light text */
+    text-align: center; 
+    margin: 0;
+    padding: 20px;
+}
+h1 { color: #3498db; margin-bottom: 20px; }
+canvas { 
+    background: #ffffff; /* White drawing surface */
+    border: 2px solid #34495e; 
+    margin: 10px auto; 
+    border-radius: 8px; 
+    display: block; /* Center the canvas */
+}
+.controls { 
+    background: #34495e; /* Darker blue for controls */
+    padding: 20px; 
+    display: inline-block; 
+    border-radius: 10px; 
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+button, input[type="number"] { 
+    padding: 10px 15px; 
+    margin: 5px; 
+    cursor: pointer; 
+    border: none; 
+    border-radius: 5px; 
+    background: #2980b9; /* Blue button */
+    color: white; 
+    font-weight: bold;
+    transition: background-color 0.2s ease;
+}
+button:hover { background-color: #3498db; }
+#stopBtn { background: #e74c3c; } /* Red for stop */
+#stopBtn:hover { background-color: #c0392b; }
+input[type="number"] {
+    background: #ecf0f1;
+    color: #2c3e50;
+    width: 60px;
+    text-align: center;
+}
+.stats { 
+    font-family: 'Consolas', 'Monaco', monospace; 
+    color: #2ecc71; /* Green for stats */
+    margin-bottom: 15px; 
+    font-size: 1.1em;
+}
+fieldset {
+    border: 1px solid #3498db;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 15px;
+}
+legend {
+    color: #3498db;
+    font-weight: bold;
+    padding: 0 10px;
+}
