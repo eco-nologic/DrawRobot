@@ -18,11 +18,11 @@ namespace Config {
 
     // Motor Pins
     constexpr int PinMotorLeftEn = 4;
-    constexpr int PinMotorLeftIn1 = 17;
-    constexpr int PinMotorLeftIn2 = 16;
+    constexpr int PinMotorLeftIn1 = 17; 
+    constexpr int PinMotorLeftIn2 = 16; 
     constexpr int PinMotorRightEn = 23;
-    constexpr int PinMotorRightIn1 = 19;
-    constexpr int PinMotorRightIn2 = 18;
+    constexpr int PinMotorRightIn1 = 18; // Swapped to correct forward direction
+    constexpr int PinMotorRightIn2 = 19; // Swapped to correct forward direction
 
     // Encoder Pins
     constexpr int PinEncoderLeftA = 33;

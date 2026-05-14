@@ -1,62 +1,56 @@
-/* DEFENSE: "Pourquoi une interface web plutôt qu'une application lourde ?" */
-/* ANSWER: Pour la portabilité (standard HTML5/CSS3) et l'absence d'installation sur le PC. */
-body { 
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-    background: #2c3e50; /* Dark blue background */
-    color: #ecf0f1; /* Light text */
-    text-align: center; 
-    margin: 0;
-    padding: 20px;
+body { font-family: sans-serif; background: #1a1a1a; color: white; text-align: center; margin: 0; }
+.container { padding: 10px; }
+.main-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; padding-bottom: 50px; }
+.panel { background: #2a2a2a; padding: 20px; border-radius: 12px; min-width: 280px; flex: 1; max-width: 400px; margin-bottom: 10px; }
+h2 { color: #0af; font-size: 1.2rem; }
+
+.d-pad {
+    display: grid;
+    grid-template-areas: 
+        ". up ."
+        "left . right"
+        ". down .";
+    gap: 8px;
+    width: 220px;
+    margin: 20px auto;
 }
-h1 { color: #3498db; margin-bottom: 20px; }
-canvas { 
-    background: #ffffff; /* White drawing surface */
-    border: 2px solid #34495e; 
-    margin: 10px auto; 
-    border-radius: 8px; 
-    display: block; /* Center the canvas */
+
+.d-pad button {
+    width: 70px;
+    height: 70px;
+    font-size: 18px;
+    border: none;
+    border-radius: 12px;
+    background: #0af;
+    color: white;
+    touch-action: manipulation;
+    user-select: none;
 }
-.controls { 
-    background: #34495e; /* Darker blue for controls */
-    padding: 20px; 
-    display: inline-block; 
-    border-radius: 10px; 
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+
+.d-pad button:active { background: #007bb5; }
+.up { grid-area: up; }
+.left { grid-area: left; }
+.right { grid-area: right; }
+.down { grid-area: down; }
+
+button { padding: 12px; margin: 5px; width: 100%; border-radius: 5px; border: none; cursor: pointer; }
+
+/* New Helpers */
+.input-group { display: flex; gap: 5px; margin-bottom: 5px; align-items: center; }
+.input-group input { width: 60px; padding: 10px; border-radius: 5px; border: 1px solid #444; background: #333; color: white; }
+.input-group button { flex: 1; }
+
+.pid-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    align-items: center;
+    margin: 15px 0;
+    font-size: 0.8rem;
 }
-button, input[type="number"] { 
-    padding: 10px 15px; 
-    margin: 5px; 
-    cursor: pointer; 
-    border: none; 
-    border-radius: 5px; 
-    background: #2980b9; /* Blue button */
-    color: white; 
-    font-weight: bold;
-    transition: background-color 0.2s ease;
-}
-button:hover { background-color: #3498db; }
-#stopBtn { background: #e74c3c; } /* Red for stop */
-#stopBtn:hover { background-color: #c0392b; }
-input[type="number"] {
-    background: #ecf0f1;
-    color: #2c3e50;
-    width: 60px;
-    text-align: center;
-}
-.stats { 
-    font-family: 'Consolas', 'Monaco', monospace; 
-    color: #2ecc71; /* Green for stats */
-    margin-bottom: 15px; 
-    font-size: 1.1em;
-}
-fieldset {
-    border: 1px solid #3498db;
-    border-radius: 8px;
-    padding: 10px;
-    margin-bottom: 15px;
-}
-legend {
-    color: #3498db;
-    font-weight: bold;
-    padding: 0 10px;
-}
+.pid-grid input { width: 100%; padding: 5px; background: #333; color: white; border: 1px solid #444; }
+
+#stopBtn { background: #e74c3c; color: white; font-weight: bold; margin-top: 20px; }
+#stopBtn:hover { background: #c0392b; }
+
+#map { background: #000; border: 2px solid #333; border-radius: 10px; margin: 20px auto; max-width: 100%; }

@@ -10,6 +10,7 @@
 #include "PathPlanner.h"
 #include "CommsManager.h"
 #include "BatteryMonitor.h"
+#include <LittleFS.h>
 
 // ============================================================================
 // GLOBAL STATE
@@ -72,6 +73,13 @@ void setup() {
     setupGpio();
     setupWifi();
 
+    // --- FILESYSTEM ---
+    if (!LittleFS.begin(true)) {
+        Serial.println("[Boot] ❌ LittleFS Mount Failed!");
+    } else {
+        Serial.println("[Boot] ✅ LittleFS Mounted");
+    }
+
     // --- I2C BUS RECOVERY ---
     // Perform bit-banging recovery BEFORE initializing the Wire peripheral
     Serial.println("[I2C] Performing bus recovery...");
@@ -128,8 +136,12 @@ void loop() {
     planner.update(dt);
 
     // 3. Telemetry broadcast
-    Pose p = pose.getPenPose();
-    comms.broadcastTelemetry(p.x, p.y, nav.getNavData().heading, battery.getVoltage());
+    static unsigned long lastTelemetry = 0;
+    if (now - lastTelemetry >= Config::TelemetryRateMsec) {
+        Pose p = pose.getPenPose();
+        comms.broadcastTelemetry(p.x, p.y, nav.getNavData().heading, battery.getVoltage());
+        lastTelemetry = now;
+    }
 
     delay(LoopRateMsec);
 }

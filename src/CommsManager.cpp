@@ -1,30 +1,19 @@
 #include "CommsManager.h"
 #include "Config.h"
+#include "DriveTrain.h"
 #include <LittleFS.h>
+
+// Access the global hardware instance defined in main.cpp
+extern DriveTrain drive;
 
 // Constructeur: Initialise le serveur sur le port 80 et définit le point d'accès WebSocket
 CommsManager::CommsManager(PathPlanner& planner) 
     : _server(80), _ws("/ws"), _planner(planner) {}
 
 void CommsManager::begin() {
-    // Montage du système de fichiers pour servir le Dashboard Web
-    // formatOnFail = true permet d'initialiser la partition si elle est corrompue
-    if(!LittleFS.begin(true)){
-        Serial.println("[Comms] Failed to mount LittleFS");
-    } else {
-        Serial.println("[Comms] LittleFS mounted successfully.");
-        
-        // Debug: Liste les fichiers présents pour valider l'upload
-        File root = LittleFS.open("/");
-        File file = root.openNextFile();
-        while(file){
-            Serial.printf("  File: %s, Size: %d bytes\n", file.name(), file.size());
-            file = root.openNextFile();
-        }
-    }
-
     // Liaison de l'événement de réception au gestionnaire de classe via une lambda
     _ws.onEvent([this](AsyncWebSocket* s, AsyncWebSocketClient* c, AwsEventType t, void* arg, uint8_t* data, size_t len) {
+        if (t == WS_EVT_CONNECT) Serial.printf("[WS] Client %u connected. Total: %u\n", c->id(), s->count());
         this->onEvent(s, c, t, arg, data, len);
     });
 
@@ -32,14 +21,19 @@ void CommsManager::begin() {
     // Sinon, le serveur statique risque d'intercepter la requête s'il est mappé sur la racine.
     _server.addHandler(&_ws);
 
-    // Route explicite pour la racine - garantit que l'index est toujours servi correctement
-    // sans dépendre du comportement de "setDefaultFile" qui varie selon les navigateurs.
-    _server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-        request->send(LittleFS, "/index.html", "text/html");
+    // Handle favicon gracefully to avoid VFS errors
+    _server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(204);
     });
 
-    // Sert les autres fichiers statiques (style.css, script.js)
-    // On mappe sans le "setDefaultFile" pour éviter les ambiguïtés de chemin sur LittleFS.
+    // Explicitly handle index to prevent 404s on root
+    auto handleIndex = [](AsyncWebServerRequest *request) {
+        request->send(LittleFS, "/index.html", "text/html");
+    };
+    _server.on("/", HTTP_GET, handleIndex);
+    _server.on("/index.html", HTTP_GET, handleIndex);
+
+    // Serve static assets
     _server.serveStatic("/", LittleFS, "/");
 
     _server.begin();
@@ -54,6 +48,15 @@ void CommsManager::onEvent(AsyncWebSocket* s, AsyncWebSocketClient* c, AwsEventT
 
         if (!error) {
             const char* cmd = doc["cmd"];
+            Serial.printf("[WS] Received command: %s\n", cmd);
+
+            // Manual D-Pad Controls
+            if (strcmp(cmd, "FORWARD") == 0) { _planner.stop(); drive.setVelocity(0.6f, 0.0f); }
+            if (strcmp(cmd, "BACKWARD") == 0) { _planner.stop(); drive.setVelocity(-0.6f, 0.0f); }
+            if (strcmp(cmd, "TURN_LEFT") == 0) { _planner.stop(); drive.setVelocity(0.0f, 1.2f); }
+            if (strcmp(cmd, "TURN_RIGHT") == 0) { _planner.stop(); drive.setVelocity(0.0f, -1.2f); }
+            if (strcmp(cmd, "STOP") == 0) { _planner.stop(); drive.stop(); }
+
             // Routage des commandes vers les séquences du PathPlanner
             if (strcmp(cmd, "stairs") == 0) _planner.startStairs();
             if (strcmp(cmd, "circle") == 0) _planner.startCircle(doc["radius"] | 50.0f);
@@ -80,6 +83,8 @@ void CommsManager::broadcastTelemetry(float x, float y, float heading, float bat
     // DEFENSE: "Pourquoi utiliser du JSON pour la télémétrie ?"
     // ANSWER: C'est un format texte léger que le JavaScript du dashboard peut parser nativement en un seul appel.
     if (_ws.count() > 0) { // On n'envoie les données que si un client est connecté (économie CPU)
+        _ws.cleanupClients();
+
         JsonDocument doc;
         doc["x"] = x; doc["y"] = y; doc["h"] = heading; doc["b"] = battery;
         
