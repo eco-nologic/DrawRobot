@@ -50,17 +50,18 @@ void PathPlanner::startCalibrationSequence() {
  * ANSWER: On ne passe à l'étape suivante que lorsque le MotionController confirme que la cible (X,Y) actuelle est atteinte.
  */
 void PathPlanner::update(float dt) {
-    // DEFENSE: "Comment gérez-vous l'enchaînement des mouvements ?"
-    // ANSWER: Par une machine à états asynchrone. On ne passe à l'étape suivante 
-    // que lorsque le MotionController confirme que la cible (X,Y) est atteinte.
-    if (_step < 0 || !_mc.isReached()) return; 
+    if (_step < 0) return; 
 
-    if (_step < 50) processStairsSequence();
-    else if (_step < 100) processSquaresSequence();
-    else if (_step < 200) processCircleSequence();
-    else if (_step < 300) processNorthSequence();
-    else processCalibrationSequence();
+    // On ne calcule le prochain waypoint que si le précédent est atteint
+    if (_mc.isReached()) {
+        if (_step < 50) processStairsSequence();
+        else if (_step < 100) processSquaresSequence();
+        else if (_step < 200) processCircleSequence();
+        else if (_step < 300) processNorthSequence();
+        else processCalibrationSequence();
+    }
 
+    // Mise à jour impérative du contrôleur pour faire tourner les PIDs et les moteurs
     _mc.update(dt);
 }
 

@@ -4,11 +4,14 @@
 MotionController::MotionController(DriveTrain& dt, PoseEstimator& pe)
     : _dt(dt), _pe(pe), 
       _pidLinear(Config::PidLinearKp, Config::PidLinearKi, Config::PidLinearKd),
-      _pidAngular(Config::PidAngularKp, Config::PidAngularKi, Config::PidAngularKd) {}
+      _pidAngular(Config::PidAngularKp, Config::PidAngularKi, Config::PidAngularKd) {
+    _reached = true;
+}
 
 void MotionController::begin() {
     _pidLinear.reset();
     _pidAngular.reset();
+    _reached = true;
 }
 
 void MotionController::moveTo(float x, float y) {
