@@ -42,6 +42,9 @@ public:
     // Démarre la rotation de calibration
     void startCalibrationSequence();
 
+    // Démarre le mode équilibriste (Easter Egg)
+    void startBalance();
+
     // Accesseurs pour la télémétrie
     float getTargetL() const;
     float getTargetTheta() const;

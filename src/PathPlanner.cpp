@@ -7,6 +7,7 @@
 #include "CircleSequence.h"
 #include "NorthSequence.h"
 #include "CalibrationSequence.h"
+#include "BalanceSequence.h" // Secret Easter Egg
 
 /**
  * DEFENSE: "Pourquoi utiliser des classes différentes pour chaque tracé ?"
@@ -51,6 +52,11 @@ void PathPlanner::startCalibrationSequence() {
     stop();
     _nav.startCalibration();
     _currentSequence = new CalibrationSequence();
+}
+
+void PathPlanner::startBalance() {
+    stop();
+    _currentSequence = new BalanceSequence();
 }
 
 void PathPlanner::update(float dt) {

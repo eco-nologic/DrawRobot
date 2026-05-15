@@ -64,6 +64,7 @@ void CommsManager::onEvent(AsyncWebSocket* s, AsyncWebSocketClient* c, AwsEventT
             if (strcmp(cmd, "north") == 0) { _planner.stop(); _planner.startNorthArrow(); }
             if (strcmp(cmd, "calibrateMag") == 0) { _planner.stop(); _planner.startCalibrationSequence(); }
             if (strcmp(cmd, "stop") == 0) { _planner.stop(); drive.stop();}
+            if (strcmp(cmd, "balance") == 0) { _planner.startBalance(); } // Easter Egg trigger
 
             // --- Nouvelle commande de configuration ---
             if (strcmp(cmd, "config") == 0) {

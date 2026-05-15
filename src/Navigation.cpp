@@ -100,7 +100,10 @@ void Navigation::calibrate() {
         }
 
         float mean = sumZ / samples;
-        // MATH: Variance = E[X^2] - (E[X])^2.
+        /**
+         * MATH: Formule de Koenig-Huygens pour la variance : Var(X) = E[X^2] - (E[X])^2.
+         * Cette méthode permet de calculer la dispersion (bruit) sans stocker les 200 points en mémoire.
+         */
         float variance = (sumSqZ / samples) - (mean * mean);
         float stdDev = sqrt(fmax(0.0f, variance));
 
@@ -151,7 +154,12 @@ void Navigation::update() {
     
     rawData.gyroX = gyroEvent.gyro.y;
     rawData.gyroY = -gyroEvent.gyro.x;
-    rawData.gyroZ = gyroEvent.gyro.z; // L'axe Z du gyro est souvent déjà aligné avec l'axe de rotation vertical du robot
+
+    // DEFENSE: "Pourquoi l'axe Z du gyroscope est-il inversé ?"
+    // ANSWER: La convention robotique impose une vitesse positive pour un virage à gauche. 
+    // Le test verifyNavigationLogic() a détecté que le capteur physique renvoyait des valeurs 
+    // positives lors d'un virage à droite. L'inversion ici garantit la stabilité du PID.
+    rawData.gyroZ = -gyroEvent.gyro.z; 
 
     rawData.magX = magEvent.magnetic.y;
     rawData.magY = -magEvent.magnetic.x;
@@ -178,21 +186,31 @@ void Navigation::update() {
     orientation.roll = atan2(rawData.accelY, rawData.accelZ);
     orientation.pitch = atan2(-rawData.accelX, sqrt(rawData.accelY * rawData.accelY + rawData.accelZ * rawData.accelZ));
 
-    // MATH: Matrice de rotation inverse pour horizontaliser les mesures magnétiques (Xh, Yh)
-    // Cela évite que le cap ne "saute" lors des accélérations ou sur un sol incliné.
+    /**
+     * MATH: Compensation d'inclinaison (Tilt Compensation).
+     * On applique une matrice de rotation inverse basée sur Pitch (P) et Roll (R) pour projeter
+     * le vecteur magnétique sur un plan horizontal virtuel (Z=0).
+     * Xh = mx*cos(P) + mz*sin(P)
+     * Yh = mx*sin(R)*sin(P) + my*cos(R) - mz*sin(R)*cos(P)
+     */
     float Xh = correctedMagX * cos(orientation.pitch) + correctedMagZ * sin(orientation.pitch);
     float Yh = correctedMagX * sin(orientation.roll) * sin(orientation.pitch) + correctedMagY * cos(orientation.roll) - correctedMagZ * sin(orientation.roll) * cos(orientation.pitch);
 
     // Calcul du cap magnétique absolu
-    // MATH: atan2(-Yh, Xh) calcule l'angle polaire. On utilise -Yh car l'angle de navigation
-    // (Heading) augmente dans le sens horaire (convention robotique) alors que le cercle trigonométrique est anti-horaire.
+    /**
+     * MATH: atan2(y, x) convertit les coordonnées cartésiennes en angle polaire (radians).
+     * On utilise -Yh car, en robotique, le cap (Heading) augmente dans le sens horaire,
+     * à l'inverse du sens trigonométrique standard.
+     */
     float magHeading = atan2(-Yh, Xh);
 
     // 2. Filtre Complémentaire (Fusion Gyro + Mag)
-    // DEFENSE: "Comment fusionnez-vous les données du gyroscope et du magnétomètre ?"
-    // ANSWER: Le gyroscope (rawData.gyroZ) donne la réactivité immédiate (haute fréquence) mais dérive.
-    // Le magnétomètre (magHeading) est stable à long terme (basse fréquence) mais bruité.
-    // Le filtre complémentaire combine les deux : Angle = Angle + (Gyro + Kp * Erreur_Mag) * dt.
+    /**
+     * MATH: Filtre Complémentaire (Fusion Sensorielle).
+     * On combine la réactivité du gyroscope (haute fréquence) et la stabilité du magnétomètre (basse fréquence).
+     * Équation : θ_n = θ_{n-1} + (ω_gyro + Kp * (θ_mag - θ_{n-1})) * dt
+     * Le gain Kp (0.05) définit la vitesse de correction de la dérive (drift).
+     */
     float gyroZRate = rawData.gyroZ - _gyroBiasZ; // Soustraire le biais du gyroscope
     float headingError = magHeading - _headingIntegral;
 

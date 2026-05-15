@@ -101,6 +101,77 @@ void verifyMotorHardware() {
     }
 }
 
+void verifyNavigationLogic() {
+    // DEFENSE: "Comment validez-vous la cohérence entre moteurs et capteurs ?"
+    // ANSWER: Par un test dynamique au boot. On commande un virage à droite et on vérifie 
+    // que le gyroscope Z renvoie une valeur négative (sens horaire). 
+    // Cela garantit que la boucle fermée du PID ne divergera pas.
+
+    Serial.println("[Boot] 🧪 Verification dynamique de l'IMU...");
+    
+    // --- TEST 1: Virage à Droite (Check Gyro Z) ---
+    // En robotique, un virage à droite (Clockwise) doit produire une vitesse angulaire négative.
+    Serial.println("[Boot]  -> Test Rotation Droite...");
+    drive.setVelocity(0.0f, -1.5f); // Vitesse angulaire négative (Droite)
+    
+    float sumGz = 0;
+    for(int i=0; i<10; i++) {
+        nav.update();
+        sumGz += nav.getNavData().gyroZ;
+        delay(50);
+    }
+    drive.stop();
+
+    float avgGz = sumGz / 10.0f;
+    
+    if (avgGz > 0.1f) {
+        Serial.println("\n[Boot] ❌ ERREUR: Direction du Gyroscope Z inversée !");
+        Serial.printf("[Boot]  Mesuré: %.2f rad/s (Attendu: < 0)\n", avgGz);
+        Serial.println("[Boot]  👉 FIX: Dans Navigation.cpp, inversez le signe de rawData.gyroZ");
+        digitalWrite(PinLedUser2, HIGH);
+    } 
+    else if (abs(avgGz) < 0.05f) {
+        Serial.println("\n[Boot] ⚠️ ERREUR: Le Gyroscope Z ne répond pas au mouvement.");
+        Serial.println("[Boot]  👉 FIX: Verifiez l'alimentation du capteur et le bus I2C.");
+        digitalWrite(PinLedUser2, HIGH);
+    }
+    else {
+        Serial.println("[Boot] ✅ Gyroscope Z en phase avec les moteurs.");
+    }
+
+    delay(200);
+
+    // --- TEST 2: Accélération Linéaire (Check Accel X) ---
+    // DEFENSE: "Comment vérifiez-vous l'accéléromètre ?"
+    // ANSWER: On envoie une impulsion brusque vers l'avant. L'accéléromètre doit détecter 
+    // une variation sur l'axe X (longitudinal). Cela valide que le remapping sensor.Y -> robot.X est correct.
+    
+    Serial.println("[Boot]  -> Test Accélération Avant...");
+    float baselineAx = nav.getRawData().accelX;
+    drive.setVelocity(0.8f, 0.0f); // Pulse de vitesse linéaire
+    
+    float maxDev = 0;
+    for(int i=0; i<8; i++) {
+        nav.update();
+        float dev = abs(nav.getRawData().accelX - baselineAx);
+        if (dev > maxDev) maxDev = dev;
+        delay(30);
+    }
+    drive.stop();
+
+    if (maxDev < 0.25f) {
+        Serial.println("\n[Boot] ❌ ERREUR: L'accéléromètre X ne détecte aucune poussée !");
+        Serial.printf("[Boot]  Variation max: %.2f m/s² (Attendu: > 0.25)\n", maxDev);
+        Serial.println("[Boot]  👉 FIX: Vérifiez si l'axe longitudinal est bien mappé sur rawData.accelX.");
+        digitalWrite(PinLedUser2, HIGH);
+    } else {
+        Serial.println("[Boot] ✅ Accéléromètre X validé.");
+    }
+
+    // Petite pause pour stabiliser le robot avant la suite
+    delay(500);
+}
+
 void setup() {
     setupSerial();
     setupGpio();
@@ -146,6 +217,11 @@ void setup() {
         Serial.println("[Boot] ❌ Navigation initialization failed! Check I2C wiring.");
         // Optional: Blink an error LED
         digitalWrite(PinLedUser2, HIGH); 
+    }
+
+    // Test de l'IMU en mouvement (si nav est prête)
+    if (navReady && Config::SYSTEM_MODE == Config::SystemRunMode::Real) {
+        verifyNavigationLogic();
     }
 
     battery.begin();

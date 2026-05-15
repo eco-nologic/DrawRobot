@@ -14,7 +14,7 @@ namespace Config {
     #endif
 
     // Firmware
-    constexpr char FirmwareVersion[] = "1.2.25";
+    constexpr char FirmwareVersion[] = "1.2.35";
 
     // Physical Parameters
     // DEFENSE: "Comment déterminez-vous la distance parcourue par tick ?"
@@ -91,6 +91,14 @@ namespace Config {
     constexpr float PidAngularKp = 0.3f;  // Réaction aux écarts de cap
     constexpr float PidAngularKi = 0.02f;
     constexpr float PidAngularKd = 0.05f;
+
+    // --- EASTER EGG: Balancing Mode (Segway Style) ---
+    // DEFENSE: "Comment le robot tient-il debout sur deux roues ?"
+    // ANSWER: Via un PID à haute fréquence (100Hz) qui compense l'erreur de tangage (Pitch).
+    constexpr float PidBalanceKp = 35.0f; 
+    constexpr float PidBalanceKi = 2.5f;
+    constexpr float PidBalanceKd = 8.0f;
+    constexpr float BalancePointRad = 1.57f; // Point d'équilibre vertical (90°)
 
     // Timing
     constexpr int LoopRateMsec = 10;

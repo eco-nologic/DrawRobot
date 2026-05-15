@@ -94,6 +94,12 @@ function sendCmd(cmd, params = {}) {
     const msg = { cmd: cmd, ...params };
     ws.send(JSON.stringify(msg));
     console.log('Sent:', msg);
+
+    if (cmd === 'balance') {
+        alert("🤫 Mode Segway activé ! Assurez-vous que le robot est debout sur ses deux roues.");
+        pathHistory = [];
+        ctx.clearRect(-CANVAS_CENTER_X / MAP_SCALE, -CANVAS_CENTER_Y / MAP_SCALE, canvas.width / MAP_SCALE, canvas.height / MAP_SCALE);
+    }
     
     if (cmd === 'stop') {
         ctx.clearRect(-CANVAS_CENTER_X / MAP_SCALE, -CANVAS_CENTER_Y / MAP_SCALE, canvas.width / MAP_SCALE, canvas.height / MAP_SCALE);

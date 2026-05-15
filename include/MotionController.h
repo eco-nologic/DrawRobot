@@ -28,6 +28,11 @@ public:
 
     bool isReached() const { return _reached; }
 
+    /**
+     * @brief Accès au DriveTrain pour les séquences spéciales (ex: BalanceSequence).
+     */
+    DriveTrain& getDriveTrain() { return _dt; }
+
 private:
     // --- Méthodes de découpage (Logic split for Defense) ---
     struct ControlErrors { float dist; float angle; };
