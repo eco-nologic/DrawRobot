@@ -10,6 +10,8 @@ public:
     void update(MotionController& mc, Navigation& nav) override;
     bool isFinished() const override;
 
+    float getTargetR() const override { return _radius; }
+
 private:
     float _radius;
     int _subStep = 0;

@@ -225,6 +225,10 @@ void loop() {
         // Les cibles X, Y et le bearingToTarget peuvent être ajoutés si MotionController les expose
         telem.targetX = 0; telem.targetY = 0; telem.bearingToTarget = 0;
 
+        telem.targetL = planner.getTargetL();
+        telem.targetTheta = planner.getTargetTheta();
+        telem.targetR = planner.getTargetR();
+
         // Envoi de la télémétrie via WebSocket (CommsManager)
         comms.broadcastTelemetry(telem);
         // Envoi de la télémétrie via BLE (BluetoothManager)

@@ -42,6 +42,11 @@ public:
     // Démarre la rotation de calibration
     void startCalibrationSequence();
 
+    // Accesseurs pour la télémétrie
+    float getTargetL() const;
+    float getTargetTheta() const;
+    float getTargetR() const;
+
 private:
     MotionController& _mc;
     Navigation& _nav;

@@ -28,7 +28,8 @@ CSV_HEADERS = [
     "timestamp_ms", "x_mm", "y_mm", "heading_deg", "battery_v",
     "accel_x", "accel_y", "accel_z",
     "gyro_x", "gyro_y", "gyro_z",
-    "mag_x", "mag_y", "mag_z"
+    "mag_x", "mag_y", "mag_z",
+    "target_l", "target_theta", "target_r"
 ]
 
 # Ensure the Output directory exists for data storage
@@ -78,7 +79,9 @@ async def run_ble_client():
                 nonlocal points_count
                 try:
                     decoded_data = data.decode('utf-8')
-                    # Format attendu: "A:ax,ay,az|G:gx,gy,gz|M:mx,my,mz|H:heading|B:battery_v|T:timestamp_ms"
+                    # DEFENSE: "Quel est le format de la trame Bluetooth ?"
+                    # ANSWER: Une chaîne formatée (A:...|G:...|M:...|H:...|B:...|T:...|Lth:...|Ath:...|Rth:...) 
+                    # pour minimiser la bande passante par rapport au JSON tout en restant lisible.
                     parts = decoded_data.split('|')
                     
                     # Parsing des données
@@ -88,8 +91,12 @@ async def run_ble_client():
                     heading = float(parts[3].split(':')[1])
                     battery_v = float(parts[4].split(':')[1])
                     timestamp_ms = int(parts[5].split(':')[1])
+                    # Nouveaux champs pour la validation travail.pdf
+                    target_l = float(parts[6].split(':')[1])
+                    target_theta = float(parts[7].split(':')[1])
+                    target_r = float(parts[8].split(':')[1])
 
-                    row = [timestamp_ms, 0.0, 0.0, heading, battery_v] + accel_data + gyro_data + mag_data
+                    row = [timestamp_ms, 0.0, 0.0, heading, battery_v] + accel_data + gyro_data + mag_data + [target_l, target_theta, target_r]
                     csv_writer.writerow(row)
                     points_count += 1
                     

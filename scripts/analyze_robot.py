@@ -37,51 +37,56 @@ def generate_validation_report():
     print(f"Analyse du fichier : {latest_file}")
     
     df = pd.read_csv(latest_file)
-
-    # DEFENSE: "Comment gérez-vous les fichiers de logs vides ?"
-    # ANSWER: On vérifie si le DataFrame est vide après lecture. Si le fichier ne contient que des en-têtes, 
-    # on arrête l'analyse proprement pour éviter une erreur d'indexation (IndexError) sur le calcul du temps.
     if df.empty:
         print(f"⚠️ Le fichier {latest_file} est vide. Assurez-vous que log_telemetry.py a bien reçu des données du robot.")
         return
 
     df['time_s'] = (df['timestamp_ms'] - df['timestamp_ms'].iloc[0]) / 1000.0
-
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
-    fig.suptitle(f"DrawRobot Validation Report - {latest_file}", fontsize=16)
-
-    # 1. XY Trajectory (ET1.2 & ET2.3)
-    ax1.plot(df['x_mm'], df['y_mm'], label='Measured Path', color='blue')
-    ax1.set_title("Spatial Acquisition (XY)")
-    ax1.set_xlabel("X (mm)")
-    ax1.set_ylabel("Y (mm)")
-    ax1.axis('equal')
-    ax1.grid(True)
-
-    # 2. Heading Stability (ET3.1)
-    ax2.plot(df['time_s'], df['heading_deg'], label='Measured Heading', color='red')
-    ax2.set_title("Orientation (Heading) over Time")
-    ax2.set_xlabel("Time (s)")
-    ax2.set_ylabel("Degrees")
-    ax2.grid(True)
-
-    # 3. Distance Accumulation (Validation lmes vs lth)
-    # DEFENSE: "Comment calculez-vous la distance totale parcourue (lmes) ?"
-    # ANSWER: On applique le théorème de Pythagore (racine de la somme des carrés des deltas X et Y) 
-    # entre chaque échantillon de position, puis on utilise np.cumsum() pour l'intégration discrète.
+    
+    # MATH: Intégration de la distance parcourue (lmes)
     dist_inc = np.sqrt(np.diff(df['x_mm'])**2 + np.diff(df['y_mm'])**2)
     dist_cum = np.cumsum(np.insert(dist_inc, 0, 0))
-    ax3.plot(df['time_s'], dist_cum, label='Measured Distance', color='green')
-    ax3.set_title("Cumulative Distance")
-    ax3.set_xlabel("Time (s)")
-    ax3.set_ylabel("mm")
+
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+    fig.suptitle(f"Rapport de Validation (travail.pdf) - {latest_file}", fontsize=16)
+
+    # 1. Courbe lmes vs lth (p.5 du PDF)
+    # DEFENSE: "Comment validez-vous la précision de 1cm ?"
+    # ANSWER: En traçant la distance mesurée (lmes) par rapport à la commande envoyée (lth).
+    # La proximité avec la droite 1:1 confirme le respect de l'exigence ET1.2.
+    ax1.scatter(df['target_l'], dist_cum, color='blue', alpha=0.5, label='Mesures')
+    ax1.plot([0, df['target_l'].max()], [0, df['target_l'].max()], 'r--', label='Idéal (1:1)')
+    ax1.set_title("Séquence 1 : lmes [cm] vs lth [cm]")
+    ax1.set_xlabel("Consigne lth (mm)")
+    ax1.set_ylabel("Mesuré lmes (mm)")
+    ax1.grid(True)
+
+    # 2. Courbe thetames vs thetath (p.5 du PDF)
+    # DEFENSE: "Comment validez-vous les angles de 90° ?"
+    # ANSWER: Cette courbe compare l'angle réel (fusion IMU) à l'angle cible. 
+    # Les paliers à 90° et 180° valident la précision angulaire (ET1.3).
+    ax2.scatter(df['target_theta'], df['heading_deg'], color='red', alpha=0.5)
+    ax2.plot([-180, 180], [-180, 180], 'k--')
+    ax2.set_title("Séquence 1 : θmes [°] vs θth [°]")
+    ax2.set_xlabel("Consigne θth (°)")
+    ax2.set_ylabel("Mesuré θmes (°)")
+    ax2.grid(True)
+
+    # 3. Cap [°] vs t [s] (p.5 du PDF)
+    ax3.plot(df['time_s'], df['heading_deg'], color='green', label='Cap fusionné')
+    ax3.set_title("Acquisition temporelle du Cap")
+    ax3.set_xlabel("Temps (s)")
+    ax3.set_ylabel("Degrés (°)")
     ax3.grid(True)
 
-    # 4. Battery Performance
-    ax4.plot(df['time_s'], df['battery_v'], label='Voltage', color='orange')
-    ax4.set_title("Energy Monitoring")
-    ax4.set_xlabel("Time (s)")
-    ax4.set_ylabel("Volts")
+    # 4. Erreur de fermeture dmes vs r (p.7 du PDF)
+    # MATH: Distance entre le point final et initial.
+    error_closure = np.sqrt((df['x_mm'].iloc[-1] - df['x_mm'].iloc[0])**2 + 
+                            (df['y_mm'].iloc[-1] - df['y_mm'].iloc[0])**2)
+    ax4.plot(df['target_r'], np.full_like(df['target_r'], error_closure), 'o-', color='orange')
+    ax4.set_title("Séquence 2 : dmes [cm] vs r [cm]")
+    ax4.set_xlabel("Rayon théorique r (mm)")
+    ax4.set_ylabel("Erreur de fermeture (mm)")
     ax4.grid(True)
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])

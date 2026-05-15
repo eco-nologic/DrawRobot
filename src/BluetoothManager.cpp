@@ -62,20 +62,16 @@ void BluetoothManager::sendTelemetry(const TelemetryPacket& packet) {
     // Si aucun client n'est connecté, on économise la batterie en ne formatant pas la chaîne.
     if (!isConnected || !_isInitialized) return;
 
-    /**
-     * MATH: Formatage de la trame pour log_telemetry.py
-     * Format: A:ax,ay,az|G:gx,gy,gz|M:mx,my,mz|H:heading|B:battery|T:timestamp
-     * Ce format compact réduit la charge du bus radio par rapport au JSON.
-     */
     char buffer[256];
     snprintf(buffer, sizeof(buffer), 
-             "A:%.2f,%.2f,%.2f|G:%.2f,%.2f,%.2f|M:%.2f,%.2f,%.2f|H:%.2f|B:%.2f|T:%lu",
+             "A:%.2f,%.2f,%.2f|G:%.2f,%.2f,%.2f|M:%.2f,%.2f,%.2f|H:%.2f|B:%.2f|T:%lu|Lth:%.1f|Ath:%.1f|Rth:%.1f",
              packet.accelX, packet.accelY, packet.accelZ,
              packet.gyroX, packet.gyroY, packet.gyroZ,
              packet.magX, packet.magY, packet.magZ,
              packet.robotHeading,
              packet.batteryVoltage,
-             millis());
+             millis(),
+             packet.targetL, packet.targetTheta, packet.targetR);
 
     if (pCharacteristic != nullptr) {
         pCharacteristic->setValue(buffer);

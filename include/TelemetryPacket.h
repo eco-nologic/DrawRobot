@@ -29,6 +29,11 @@ struct TelemetryPacket {
     int waypointIndex;
     float targetX, targetY;
     float bearingToTarget; // Cap vers la cible
+
+    // Valeurs Théoriques (pour validation travail.pdf)
+    float targetL;      // Distance théorique demandée (lth)
+    float targetTheta;  // Angle théorique demandé (theth)
+    float targetR;      // Rayon théorique (rth)
 };
 
 #endif // TELEMETRY_PACKET_H

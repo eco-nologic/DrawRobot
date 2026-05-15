@@ -70,3 +70,15 @@ void PathPlanner::update(float dt) {
         _currentSequence->update(_mc, _nav);
     }
 }
+
+float PathPlanner::getTargetL() const {
+    return _currentSequence ? _currentSequence->getTargetL() : 0.0f;
+}
+
+float PathPlanner::getTargetTheta() const {
+    return _currentSequence ? _currentSequence->getTargetTheta() : 0.0f;
+}
+
+float PathPlanner::getTargetR() const {
+    return _currentSequence ? _currentSequence->getTargetR() : 0.0f;
+}
