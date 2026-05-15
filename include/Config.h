@@ -5,16 +5,37 @@
 #include <cmath>
 
 namespace Config {
+    // Mode de fonctionnement du système
+    enum class SystemRunMode { Real, Sim };
+    #ifdef MODE_SIM
+      constexpr SystemRunMode SYSTEM_MODE = SystemRunMode::Sim;
+    #else
+      constexpr SystemRunMode SYSTEM_MODE = SystemRunMode::Real;
+    #endif
+
     // Firmware
-    constexpr char FirmwareVersion[] = "1.0.0";
+    constexpr char FirmwareVersion[] = "1.1.8";
 
     // Physical Parameters
-    constexpr float WHEEL_DIAMETER = 90.0f;
-    constexpr float WHEEL_BASE = 83.0f;
-    constexpr float PEN_OFFSET = 130.0f;
-    constexpr int STEPS_PER_REV = 1070;
+    // DEFENSE: "Comment déterminez-vous la distance parcourue par tick ?"
+    // ANSWER: On divise la circonférence de la roue (D * PI) par la résolution de l'encodeur (1070).
+    constexpr float WHEEL_DIAMETER = 90.0f;   // Diamètre de la roue en mm
+    
+    // DEFENSE: "À quoi sert le WHEEL_BASE dans vos calculs ?"
+    // ANSWER: C'est l'entraxe (L). Il est indispensable pour convertir une vitesse angulaire 
+    // souhaitée en différence de vitesse entre la roue gauche et la roue droite.
+    constexpr float WHEEL_BASE = 83.0f;       
+    
+    // DEFENSE: "Pourquoi le stylo n'est-il pas au centre de l'essieu ?"
+    // ANSWER: La conception mécanique place le stylo à 130mm. Mathématiquement, on doit 
+    // compenser ce décalage pour que le tracé corresponde à la trajectoire (cinématique du bras de levier).
+    constexpr float PEN_OFFSET = 130.0f;      
+    
+    constexpr int STEPS_PER_REV = 1070;       // Résolution totale de l'encodeur
+    
+    // MATH: mm_par_step = (Circonférence) / (Ticks_par_tour)
     constexpr float MM_PER_STEP = (WHEEL_DIAMETER * M_PI) / STEPS_PER_REV;
-    constexpr float MM_PER_TICK = MM_PER_STEP; // Required by PoseEstimator
+    constexpr float MM_PER_TICK = MM_PER_STEP; // Utilisé par le PoseEstimator pour l'intégration de la distance
 
     // Motor Pins
     constexpr int PinMotorLeftEn = 4;
@@ -61,16 +82,23 @@ namespace Config {
     constexpr float SQUARE_GROWTH = 20.0f;
 
     // PID Parameters
-    constexpr float PidLinearKp = 0.5f;
-    constexpr float PidLinearKi = 0.05f;
+    // DEFENSE: "Comment le robot corrige-t-il sa trajectoire en temps réel ?"
+    // ANSWER: Via deux boucles PID. Le PID linéaire gère la distance vers la cible 
+    // et le PID angulaire maintient l'orientation vers le waypoint.
+    constexpr float PidLinearKp = 0.5f;   // Réaction à l'erreur de distance
+    constexpr float PidLinearKi = 0.05f;  // Compensation des frottements (erreur statique)
     constexpr float PidLinearKd = 0.1f;
-    constexpr float PidAngularKp = 0.3f;
+    constexpr float PidAngularKp = 0.3f;  // Réaction aux écarts de cap
     constexpr float PidAngularKi = 0.02f;
     constexpr float PidAngularKd = 0.05f;
 
     // Timing
     constexpr int LoopRateMsec = 10;
-    constexpr int TelemetryRateMsec = 50;
+    // DEFENSE: "Pourquoi avoir réduit la fréquence de la télémétrie ?"
+    // ANSWER: Pour prioriser les ressources CPU sur la boucle de navigation et la correction 
+    // de trajectoire (100Hz). Réduire la télémétrie à 10Hz (100ms) diminue la charge 
+    // du bus WiFi/WebSocket sans impacter la perception humaine du mouvement sur le dashboard.
+    constexpr int TelemetryRateMsec = 100;
     constexpr int StatusLedToggleMsec = 500;
 }
 

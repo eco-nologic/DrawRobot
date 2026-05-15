@@ -2,6 +2,7 @@ import serial
 import json
 import csv
 import time
+import os
 
 # CONFIGURATION
 # DEFENSE: "Comment communiquez-vous avec le robot depuis le PC ?"
@@ -9,7 +10,14 @@ import time
 # Le script Python parse les lignes JSON et les enregistre pour analyse.
 PORT = 'COM10'  # Modifier selon votre port Bluetooth (ex: /dev/rfcomm0 sur Linux)
 BAUD = 115200
-FILENAME = f"robot_data_{int(time.time())}.csv"
+
+# Ensure the Output directory exists for data storage
+if not os.path.exists("Output"):
+    os.makedirs("Output")
+
+# Math: int(time.time()) provides a unique Unix Epoch timestamp (integer).
+# This ensures that every run creates a unique file in the Output folder without overwriting data.
+FILENAME = os.path.join("Output", f"robot_data_{int(time.time())}.csv")
 
 print(f"Connexion au robot sur {PORT}...")
 try:

@@ -3,19 +3,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 import glob
 import os
+import time
 
 def generate_validation_report():
     """
     @brief Analyse les logs CSV et génère les graphiques de validation.
-    DEFENSE: "Comment avez-vous validé la précision de 1cm ?"
-    ANSWER: Nous utilisons ce script pour traiter les données capturées par Bluetooth et générer les graphiques lmes vs lth demandés en p.17.
     """
-    list_of_files = glob.glob('robot_data_*.csv')
+    # DEFENSE: "Où sont stockées les données brutes ?"
+    # ANSWER: Dans le dossier 'Output/', ce qui permet de séparer le code source des mesures expérimentales.
+    list_of_files = glob.glob(os.path.join('Output', 'robot_data_*.csv'))
     if not list_of_files:
         print("No log files found.")
         return
     
     latest_file = max(list_of_files, key=os.path.getctime)
+    print(f"Analyse du fichier : {latest_file}")
+    
     df = pd.read_csv(latest_file)
     df['time_s'] = (df['timestamp_ms'] - df['timestamp_ms'].iloc[0]) / 1000.0
 
@@ -38,6 +41,9 @@ def generate_validation_report():
     ax2.grid(True)
 
     # 3. Distance Accumulation (Validation lmes vs lth)
+    # DEFENSE: "Comment calculez-vous la distance totale parcourue (lmes) ?"
+    # ANSWER: On applique le théorème de Pythagore (racine de la somme des carrés des deltas X et Y) 
+    # entre chaque échantillon de position, puis on utilise np.cumsum() pour l'intégration discrète.
     dist_inc = np.sqrt(np.diff(df['x_mm'])**2 + np.diff(df['y_mm'])**2)
     dist_cum = np.cumsum(np.insert(dist_inc, 0, 0))
     ax3.plot(df['time_s'], dist_cum, label='Measured Distance', color='green')
@@ -56,6 +62,9 @@ def generate_validation_report():
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     
     # Final validation calculation
+    # DEFENSE: "Comment calculez-vous l'erreur de fermeture ?"
+    # ANSWER: C'est la distance euclidienne entre le premier point (0,0) et le dernier point capturé.
+    # Elle permet de quantifier la dérive cumulée (drift) sur l'ensemble du trajet.
     error_closure = np.sqrt((df['x_mm'].iloc[-1] - df['x_mm'].iloc[0])**2 + 
                             (df['y_mm'].iloc[-1] - df['y_mm'].iloc[0])**2)
     
@@ -63,9 +72,13 @@ def generate_validation_report():
     print(f"Total distance: {dist_cum[-1]:.2f} mm")
     print(f"Closure error: {error_closure:.2f} mm")
     
-    # Magnetometer Calibration Suggestion
-    print(f"Suggested Mag Offsets: X={df['mag_x'].mean():.2f}, Y={df['mag_y'].mean():.2f}")
-
+    # Sauvegarde automatique du rapport dans Output
+    if not os.path.exists("Output"):
+        os.makedirs("Output")
+    report_file = os.path.join("Output", f"validation_report_{int(time.time())}.png")
+    plt.savefig(report_file)
+    print(f"📊 Rapport sauvegardé dans: {report_file}")
+    
     plt.show()
 
 if __name__ == "__main__":

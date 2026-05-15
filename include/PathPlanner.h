@@ -4,6 +4,9 @@
 #include "MotionController.h"
 #include "Navigation.h"
 
+// Déclaration anticipée pour le pattern Strategy
+class IDrawSequence;
+
 /**
  * DEFENSE: "Comment est organisée la logique de tracé ?"
  * ANSWER: Par un gestionnaire de trajectoire (PathPlanner) qui décompose 
@@ -40,29 +43,9 @@ public:
     void startCalibrationSequence();
 
 private:
-    // --- Méthodes de découpage (Simplification pour la soutenance) ---
-    void processStairsSequence();  // Gère la Séquence 1
-    void processSquaresSequence(); // Gère FA1
-    void processCircleSequence();  // Gère la Séquence 2
-    void processNorthSequence();   // Gère la Séquence 3
-    void processCalibrationSequence(); 
-
-    // --- Sous-fonctions de tracé (Tips: Modularité) ---
-    void drawMainCircle();         // Étape 100
-    void drawRosacePetal();        // Étape 150
-    void drawArrowBody();          // Étape 200
-    void drawArrowHeadFill();      // Étape 201
-
     MotionController& _mc;
     Navigation& _nav;
-    int _step = -1; // -1 = IDLE, >= 0 = Index de la séquence
-
-    // Variables d'état pour les séquences
-    float _targetRadius = 0;
-    int _subStep = 0;
-    float _currentSize = 0;
-    int _currentCount = 0;
-    float _arrowX = 0, _arrowY = 0; // Stockage pour la Séquence 3
+    IDrawSequence* _currentSequence = nullptr;
 };
 
 #endif

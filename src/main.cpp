@@ -62,10 +62,40 @@ void setupSerial() {
     Serial.begin(115200);
     delay(500);  // Wait for serial to stabilize
     Serial.println("\n\n========================================");
-    Serial.println("DrawRobot Firmware v1.0.0");
+    Serial.printf("DrawRobot Firmware v%s\n", Config::FirmwareVersion);
     Serial.println("========================================\n");
 
     Serial.println("[Boot] Mode: REAL HARDWARE");
+}
+
+void verifyMotorHardware() {
+    Serial.println("[Boot] ⚙️ Verification de la chaine cinematique...");
+    
+    // DEFENSE: "Pourquoi testez-vous les moteurs au démarrage ?"
+    // ANSWER: Pour garantir l'intégrité du matériel. Si un fil est débranché 
+    // ou qu'un moteur est bloqué, on l'identifie avant de commencer le tracé.
+    
+    long startL = leftMotor.getTicks();
+    long startR = rightMotor.getTicks();
+
+    // Pulse de 250ms à 40% de puissance
+    leftMotor.setSpeed(0.4f); 
+    rightMotor.setSpeed(0.4f);
+    delay(250);
+    leftMotor.setSpeed(0);
+    rightMotor.setSpeed(0);
+    delay(100); // Stabilisation
+
+    bool leftOk = abs(leftMotor.getTicks() - startL) > 5;
+    bool rightOk = abs(rightMotor.getTicks() - startR) > 5;
+
+    if (!leftOk || !rightOk) {
+        if (!leftOk) Serial.println("[Boot] ❌ ERREUR: Echec moteur/encodeur GAUCHE !");
+        if (!rightOk) Serial.println("[Boot] ❌ ERREUR: Echec moteur/encodeur DROIT !");
+        digitalWrite(PinLedUser2, HIGH); // LED d'alerte
+    } else {
+        Serial.println("[Boot] ✅ Materiel moteur operationnel");
+    }
 }
 
 void setup() {
@@ -78,6 +108,12 @@ void setup() {
         Serial.println("[Boot] ❌ LittleFS Mount Failed!");
     } else {
         Serial.println("[Boot] ✅ LittleFS Mounted");
+    }
+
+    // Initialisation et test des moteurs AVANT la navigation/calibration
+    if (Config::SYSTEM_MODE == Config::SystemRunMode::Real) {
+        drive.begin();
+        verifyMotorHardware();
     }
 
     // --- I2C BUS RECOVERY ---
@@ -110,7 +146,6 @@ void setup() {
     }
 
     battery.begin();
-    drive.begin();
     pose.begin();
     motion.begin();
     comms.begin();
@@ -127,15 +162,19 @@ void loop() {
     float dt = (now - lastLoopTime) / 1000.0f;
     lastLoopTime = now;
 
-    // 1. Update Sensors & Localization
+    // 1. Update Sensors & Localization (Couche Basse)
     if (navReady) nav.update();
     battery.update();
     pose.update();
 
-    // 2. Update Path & Control
+    // 2. Update Control Logic (Couche Moyenne - PID)
+    // On met à jour le contrôleur de mouvement indépendamment du planificateur
+    motion.update(dt);
+
+    // 3. Update Sequence Planner (Couche Haute - Stratégie)
     planner.update(dt);
 
-    // 3. Telemetry broadcast
+    // 4. Telemetry broadcast
     static unsigned long lastTelemetry = 0;
     if (now - lastTelemetry >= Config::TelemetryRateMsec) {
         Pose p = pose.getPenPose();
