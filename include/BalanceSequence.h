@@ -12,6 +12,8 @@ public:
 
 private:
     PIDController _pidBalance;
+    float _fusedTilt = 0.0f;
+    bool _firstRun = true;
 };
 
 #endif

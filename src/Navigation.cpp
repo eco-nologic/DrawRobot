@@ -148,9 +148,9 @@ void Navigation::update() {
      * (X=Avant, Y=Gauche, Z=Haut) pour que les algorithmes de navigation standard fonctionnent.
      */
     // Remap axes: Sensor Y -> Robot X (Forward), Sensor -X -> Robot Y (Left), Sensor Z -> Robot Z (Up)
-    rawData.accelX = accelEvent.acceleration.y;
-    rawData.accelY = -accelEvent.acceleration.x;
-    rawData.accelZ = accelEvent.acceleration.z;
+    rawData.accelX = accelEvent.acceleration.y;      // Sensor Y -> Robot X (Forward)
+    rawData.accelY = -accelEvent.acceleration.x;     // Sensor -X -> Robot Y (Left)
+    rawData.accelZ = accelEvent.acceleration.z;      // Sensor Z -> Robot Z (Up)
     
     rawData.gyroX = gyroEvent.gyro.y;
     rawData.gyroY = -gyroEvent.gyro.x;

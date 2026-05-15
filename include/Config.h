@@ -14,7 +14,7 @@ namespace Config {
     #endif
 
     // Firmware
-    constexpr char FirmwareVersion[] = "1.2.35";
+    constexpr char FirmwareVersion[] = "1.2.51";
 
     // Physical Parameters
     // DEFENSE: "Comment déterminez-vous la distance parcourue par tick ?"
@@ -32,6 +32,7 @@ namespace Config {
     constexpr float PEN_OFFSET = 130.0f;      
     
     constexpr int STEPS_PER_REV = 1070;       // Résolution totale de l'encodeur
+    constexpr float MaxLinearSpeedMmS = 120.0f; // Vitesse linéaire maximale (mm/s)
     
     // MATH: mm_par_step = (Circonférence) / (Ticks_par_tour)
     constexpr float MM_PER_STEP = (WHEEL_DIAMETER * M_PI) / STEPS_PER_REV;
@@ -95,10 +96,17 @@ namespace Config {
     // --- EASTER EGG: Balancing Mode (Segway Style) ---
     // DEFENSE: "Comment le robot tient-il debout sur deux roues ?"
     // ANSWER: Via un PID à haute fréquence (100Hz) qui compense l'erreur de tangage (Pitch).
-    constexpr float PidBalanceKp = 35.0f; 
-    constexpr float PidBalanceKi = 2.5f;
-    constexpr float PidBalanceKd = 8.0f;
-    constexpr float BalancePointRad = 1.57f; // Point d'équilibre vertical (90°)
+    // DEFENSE: "Pourquoi les moteurs tournaient-ils à fond à la main ?"
+    // ANSWER: Le gain Kp était trop élevé (150). Une inclinaison de 1° provoquait une saturation 
+    // immédiate des moteurs. Nous avons réduit Kp à 45 pour une réponse plus proportionnelle 
+    // et augmenté Kd pour amortir l'effet ressort.
+    constexpr float PidBalanceKp = 45.0f; 
+    constexpr float PidBalanceKi = 2.0f; 
+    constexpr float PidBalanceKd = 8.0f; 
+    
+    // MATH: Le point d'équilibre est quand l'axe X du robot est parfaitement vertical (gravité).
+    // atan2(accelZ, accelX) devrait être 0 quand le robot est debout (accelZ=0, accelX=9.81).
+    constexpr float BalancePointRad = 0.0f; // Angle cible pour le Pitch (0 = vertical)
 
     // Timing
     constexpr int LoopRateMsec = 10;

@@ -23,8 +23,8 @@ void DriveTrain::begin() {
 void DriveTrain::setVelocity(float linear, float angular) {
     // Calcul des vitesses individuelles des roues
     // angular est en rad/s, linear est normalisé ou en mm/s
-    float leftVel  = linear - (angular * _wheelBase / 2.0f);
-    float rightVel = linear + (angular * _wheelBase / 2.0f);
+    float leftVel  = linear - (angular * (_wheelBase / 2.0f));
+    float rightVel = linear + (angular * (_wheelBase / 2.0f));
 
     // Contrainte des valeurs pour éviter la saturation logicielle
     leftVel  = constrain(leftVel, -1.0f, 1.0f);
