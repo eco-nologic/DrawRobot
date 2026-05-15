@@ -1,3 +1,20 @@
+import sys
+import subprocess
+
+# Détection et installation automatique des dépendances
+required_packages = {
+    "pandas": "pandas",
+    "matplotlib": "matplotlib",
+    "numpy": "numpy"
+}
+
+for module, package in required_packages.items():
+    try:
+        __import__(module)
+    except ImportError:
+        print(f"[Python] Module '{module}' manquant. Installation de '{package}'...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,6 +37,14 @@ def generate_validation_report():
     print(f"Analyse du fichier : {latest_file}")
     
     df = pd.read_csv(latest_file)
+
+    # DEFENSE: "Comment gérez-vous les fichiers de logs vides ?"
+    # ANSWER: On vérifie si le DataFrame est vide après lecture. Si le fichier ne contient que des en-têtes, 
+    # on arrête l'analyse proprement pour éviter une erreur d'indexation (IndexError) sur le calcul du temps.
+    if df.empty:
+        print(f"⚠️ Le fichier {latest_file} est vide. Assurez-vous que log_telemetry.py a bien reçu des données du robot.")
+        return
+
     df['time_s'] = (df['timestamp_ms'] - df['timestamp_ms'].iloc[0]) / 1000.0
 
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))

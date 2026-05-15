@@ -7,6 +7,18 @@
 #include <Adafruit_LIS3MDL.h>
 #include "Config.h"
 
+// Structure pour les données brutes de l'IMU
+struct ImuData {
+    float accelX, accelY, accelZ;
+    float gyroX, gyroY, gyroZ;
+    float magX, magY, magZ;
+};
+
+// Structure pour les données d'orientation fusionnées (Roll, Pitch, Heading)
+struct OrientationData {
+    float roll, pitch, heading;
+};
+
 /**
  * DEFENSE: "Quels protocoles sont utilisés pour communiquer avec les capteurs ?"
  * ANSWER: Le protocole I2C (Inter-Integrated Circuit) via les broches SDA(21) et SCL(22).
@@ -19,7 +31,7 @@ public:
         bool isCalibrated;  // État de la calibration magnétique
     };
 
-    Navigation() = default;
+    Navigation();
 
     // Initialise le bus I2C et les capteurs (LSM6DS3 + LIS3MDL)
     bool begin();
@@ -57,21 +69,26 @@ public:
      */
     void startCalibration();
     void stopCalibration();
+    bool isCalibrated() const;
 
-    NavData getNavData() const { return _data; }
-    float getHeading() const { return _data.heading; }
+    NavData getNavData() const { return _data; } // Données de navigation fusionnées
+    ImuData getRawData() const { return rawData; } // Données brutes des capteurs
+    float getHeading() const { return _data.heading; } // Cap fusionné en degrés
 
 private:
     NavData _data;
     Adafruit_LSM6DS3 _lsm;
     Adafruit_LIS3MDL _lis;
+    ImuData rawData; // Données brutes des capteurs
+    OrientationData orientation; // Données d'orientation fusionnées (Roll, Pitch, Heading)
     float _magMinX = 1000, _magMaxX = -1000, _magMinY = 1000, _magMaxY = -1000;
     float _gyroBiasZ = 0;
     float _headingIntegral = 0;
     unsigned long _lastUpdate = 0;
     bool _isCalibrating = false;
-    const float _magOffsetX = 0.0f; // À remplir après analyze_imu.py
-    const float _magOffsetY = 0.0f;
+    float _magOffsetX = 0.0f; 
+    float _magOffsetY = 0.0f;
+    float _magOffsetZ = 0.0f;
 };
 
 #endif

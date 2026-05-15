@@ -7,9 +7,15 @@
  * ANSWER: On définit l'origine (0,0,0) au moment du démarrage, ce qui servira de référentiel pour tout le tracé.
  */
 PoseEstimator::PoseEstimator(IMotor& left, IMotor& right, Navigation& nav)
-    : _left(left), _right(right), _nav(nav) {}
+    : _left(left), _right(right), _nav(nav), _mmPerTick(Config::MM_PER_TICK) 
+{
+    // MATH: Initialisation de la constante ticks -> mm via la liste d'initialisation (obligatoire pour un membre const).
+}
 
 void PoseEstimator::begin() {
+    // DEFENSE: "Pourquoi ne pas affecter _mmPerTick ici ?"
+    // ANSWER: Parce que c'est une constante de conception. Elle est fixée à la construction 
+    // de l'objet pour garantir l'intégrité des calculs d'odométrie.
     reset();
 }
 
@@ -32,11 +38,20 @@ void PoseEstimator::update() {
     // Distance linéaire parcourue par le centre du robot
     float dCenter = (dL + dR) / 2.0f;
 
+    // 1. Mise à jour de la Ppose fusionnée (Robot Pose)
+    // On utilise le cap absolu venant de la fusion IMU (Nav)
     _robotPose.theta = _nav.getNavData().heading * (M_PI / 180.0f); // Conversion deg -> rad
-
-    // Mise à jour de la position (x, y) du centre de l'essieu
     _robotPose.x += dCenter * cos(_robotPose.theta);
     _robotPose.y += dCenter * sin(_robotPose.theta);
+
+    // 2. Mise à jour de la pose "Fantôme" (Pure Odométrie)
+    // DEFENSE: "Comment calculez-vous la pose sans IMU ?"
+    // ANSWER: Par intégration des encodeurs uniquement. La variation d'angle (dTheta) 
+    // est calculée via la différence de parcours entre les deux roues divisée par l'entraxe.
+    float dTheta = (dR - dL) / Config::WHEEL_BASE;
+    _ghostPose.theta += dTheta;
+    _ghostPose.x += dCenter * cos(_ghostPose.theta);
+    _ghostPose.y += dCenter * sin(_ghostPose.theta);
 }
 
 /**
@@ -52,8 +67,13 @@ Pose PoseEstimator::getPenPose() const {
     return pen;
 }
 
+Pose PoseEstimator::getGhostPose() const {
+    return _ghostPose;
+}
+
 void PoseEstimator::reset(float x, float y, float theta) {
     _robotPose = {x, y, theta};
+    _ghostPose = {x, y, theta};
     _lastTicksL = _left.getTicks();
     _lastTicksR = _right.getTicks();
 }

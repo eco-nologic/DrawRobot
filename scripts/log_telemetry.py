@@ -1,57 +1,131 @@
-import serial
-import json
+import asyncio
+import platform
+import sys
+import subprocess
 import csv
 import time
 import os
+from bleak import BleakClient, BleakScanner
 
-# CONFIGURATION
-# DEFENSE: "Comment communiquez-vous avec le robot depuis le PC ?"
-# ANSWER: Le PC se connecte au port série virtuel créé par le Bluetooth (COM port).
-# Le script Python parse les lignes JSON et les enregistre pour analyse.
-PORT = 'COM10'  # Modifier selon votre port Bluetooth (ex: /dev/rfcomm0 sur Linux)
-BAUD = 115200
+# --- Détection et installation automatique des dépendances ---
+try:
+    import bleak
+    import serial.tools.list_ports # Pour la liste des ports en cas d'erreur
+except ImportError:
+    print("[Python] Modules 'bleak' ou 'pyserial' manquants. Installation en cours...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "bleak", "pyserial"])
+    import bleak
+    import serial.tools.list_ports
+
+# --- Configuration BLE ---
+# Ces UUIDs doivent correspondre à ceux définis dans BluetoothManager.cpp de votre firmware
+DEVICE_NAME = "GiRobot_BLE"
+SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+
+# --- Configuration CSV ---
+CSV_HEADERS = [
+    "timestamp_ms", "x_mm", "y_mm", "heading_deg", "battery_v",
+    "accel_x", "accel_y", "accel_z",
+    "gyro_x", "gyro_y", "gyro_z",
+    "mag_x", "mag_y", "mag_z"
+]
 
 # Ensure the Output directory exists for data storage
 if not os.path.exists("Output"):
     os.makedirs("Output")
 
-# Math: int(time.time()) provides a unique Unix Epoch timestamp (integer).
-# This ensures that every run creates a unique file in the Output folder without overwriting data.
+# MATH: int(time.time()) fournit un timestamp Unix unique.
 FILENAME = os.path.join("Output", f"robot_data_{int(time.time())}.csv")
 
-print(f"Connexion au robot sur {PORT}...")
-try:
-    ser = serial.Serial(PORT, BAUD, timeout=1)
-    print(f"Enregistrement dans {FILENAME}. Appuyez sur Ctrl+C pour arreter.")
-    
-    with open(FILENAME, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        # En-tetes correspondant aux exigences du rapport (lmes, theta, t)
-        writer.writerow(['timestamp_ms', 'x_mm', 'y_mm', 'heading_deg', 'battery_v'])
-        
-        while True:
-            if ser.in_waiting > 0:
-                line = ser.readline().decode('utf-8').strip()
+async def run_ble_client():
+    print(f"Recherche du robot BLE : {DEVICE_NAME}...")
+    # MATH/LOGIC: On augmente le timeout à 10s pour laisser le temps à la pile Bluetooth 
+    # Windows de découvrir l'appareil, surtout en environnement bruité.
+    device = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10.0)
+
+    if not device:
+        print(f"❌ Appareil '{DEVICE_NAME}' non trouvé. Assurez-vous que l'ESP32 est allumé et diffuse.")
+        # Tente de lister les ports COM pour aider au diagnostic si BLE ne fonctionne pas
+        try:
+            ports = list(serial.tools.list_ports.comports())
+            if ports:
+                print("\nPorts COM détectés (pour diagnostic si BLE échoue) :")
+                for p in ports:
+                    print(f"  - {p.device} ({p.description})")
+            else:
+                print("\nAucun port COM détecté. Vérifiez vos connexions.")
+        except Exception:
+            pass # pyserial peut ne pas être installé
+        return
+
+    print(f"Appareil trouvé à l'adresse : {device.address}. Connexion...")
+
+    async with BleakClient(device) as client:
+        if not client.is_connected:
+            print(f"❌ Échec de la connexion à {DEVICE_NAME}.")
+            return
+
+        print(f"✅ Connecté à {DEVICE_NAME}!")
+
+        points_count = 0
+        with open(FILENAME, 'w', newline='') as csvfile:
+            csv_writer = csv.writer(csvfile)
+            csv_writer.writerow(CSV_HEADERS)
+            print(f"Enregistrement des données dans {FILENAME}")
+
+            def notification_handler(sender, data):
+                nonlocal points_count
                 try:
-                    # Parsing des donnees envoyees par BluetoothManager.cpp
-                    data = json.loads(line)
-                    writer.writerow([
-                        data['t'], 
-                        data['x'], 
-                        data['y'], 
-                        data['h'], 
-                        data['b']
-                    ])
-                    # Feedback console pour surveiller le robot pendant le tracé
-                    print(f"T={data['t']}ms | X={data['x']:.1f} Y={data['y']:.1f} | Bat={data['b']:.1f}V")
-                except json.JSONDecodeError:
-                    pass # Ignorer les lignes de debug non-JSON
+                    decoded_data = data.decode('utf-8')
+                    # Format attendu: "A:ax,ay,az|G:gx,gy,gz|M:mx,my,mz|H:heading|B:battery_v|T:timestamp_ms"
+                    parts = decoded_data.split('|')
                     
-except serial.SerialException as e:
-    print(f"Erreur de connexion : {e}")
-    print("Assurez-vous que le robot est apparie et que le port COM est correct.")
-except KeyboardInterrupt:
-    print("\nCapture terminee. Fichier enregistre.")
-finally:
-    if 'ser' in locals() and ser.is_open:
-        ser.close()
+                    # Parsing des données
+                    accel_data = [float(x) for x in parts[0].split(':')[1].split(',')]
+                    gyro_data = [float(x) for x in parts[1].split(':')[1].split(',')]
+                    mag_data = [float(x) for x in parts[2].split(':')[1].split(',')]
+                    heading = float(parts[3].split(':')[1])
+                    battery_v = float(parts[4].split(':')[1])
+                    timestamp_ms = int(parts[5].split(':')[1])
+
+                    row = [timestamp_ms, 0.0, 0.0, heading, battery_v] + accel_data + gyro_data + mag_data
+                    csv_writer.writerow(row)
+                    points_count += 1
+                    
+                    # Feedback console et sauvegarde physique immédiate
+                    if points_count % 10 == 0:
+                        print(f"📡 Recu: {points_count} points | T={timestamp_ms}ms | H={heading:.2f}° | Bat={battery_v:.1f}V")
+                        csvfile.flush()
+
+                except Exception as e:
+                    print(f"⚠️ Erreur de traitement de la notification: {e} - Données brutes: {data.hex()}")
+
+            print(f"Abonnement à la caractéristique: {CHARACTERISTIC_UUID}")
+            await client.start_notify(CHARACTERISTIC_UUID, notification_handler)
+
+            print("Capture des données démarrée. Appuyez sur Ctrl+C pour arrêter.")
+            while client.is_connected:
+                await asyncio.sleep(1) # Maintient la connexion active
+
+        print("Déconnecté de l'appareil BLE.")
+
+async def main():
+    try:
+        await run_ble_client()
+    except asyncio.CancelledError:
+        print("\nClient BLE arrêté par l'utilisateur.")
+    except Exception as e:
+        print(f"Une erreur inattendue est survenue: {e}")
+
+if __name__ == "__main__":
+    # S'assurer que le script est exécuté avec Python 3.7+
+    if sys.version_info < (3, 7):
+        print("Ce script nécessite Python 3.7 ou plus récent.")
+        sys.exit(1)
+
+    # DEFENSE: "Pourquoi avoir supprimé WindowsSelectorEventLoopPolicy ?"
+    # ANSWER: Cette politique est obsolète depuis Python 3.12. Bleak sur Windows 10/11 
+    # utilise désormais nativement la boucle Proactor pour une meilleure gestion du Bluetooth.
+
+    asyncio.run(main())

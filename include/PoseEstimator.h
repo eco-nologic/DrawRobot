@@ -32,6 +32,13 @@ public:
     // Retourne la position exacte du stylo (décalage de 130mm inclus)
     Pose getPenPose() const;
 
+    /**
+     * DEFENSE: "À quoi servent les données 'Ghost' ?"
+     * ANSWER: À quantifier l'apport de l'IMU. On compare la position estimée par les roues 
+     * seules (Ghost) à la position fusionnée pour détecter les dérives odométriques.
+     */
+    Pose getGhostPose() const;
+
     void reset(float x = 0, float y = 0, float theta = 0);
 
 private:
@@ -39,6 +46,7 @@ private:
     Navigation &_nav;
 
     Pose _robotPose; // Position du centre de l'essieu
+    Pose _ghostPose; // Position estimée par odométrie pure
     long _lastTicksL, _lastTicksR;
     
     // Facteurs de conversion (Config.h)

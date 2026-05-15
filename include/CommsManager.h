@@ -5,6 +5,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include "PathPlanner.h"
+#include "TelemetryPacket.h"
 
 /**
  * DEFENSE: "Pourquoi utiliser des WebSockets et du JSON ?"
@@ -18,7 +19,7 @@ public:
     void begin();
     
     // Envoie l'état du robot (X, Y, Cap, Batterie) au tableau de bord
-    void broadcastTelemetry(float x, float y, float heading, float battery);
+    void broadcastTelemetry(const TelemetryPacket& packet);
 
 private:
     AsyncWebServer _server;

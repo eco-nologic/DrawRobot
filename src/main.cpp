@@ -11,6 +11,8 @@
 #include "CommsManager.h"
 #include "BatteryMonitor.h"
 #include <LittleFS.h>
+#include "BluetoothManager.h" // Inclure BluetoothManager
+#include "TelemetryPacket.h"  // Inclure TelemetryPacket
 
 // ============================================================================
 // GLOBAL STATE
@@ -21,9 +23,10 @@ DriveTrain drive(leftMotor, rightMotor);
 Navigation nav;
 PoseEstimator pose(leftMotor, rightMotor, nav);
 MotionController motion(drive, pose);
-PathPlanner planner(motion, nav);
+PathPlanner planner(motion, nav); // PathPlanner a besoin de MotionController et Navigation
 CommsManager comms(planner);
 BatteryMonitor battery;
+BluetoothManager ble; // Instance globale du BluetoothManager
 
 unsigned long lastLoopTime = 0;
 bool navReady = false;
@@ -151,6 +154,13 @@ void setup() {
     comms.begin();
     
     Serial.println("[Boot] Initialization complete!");
+
+    // Initialisation du BluetoothManager
+    if (!ble.begin()) {
+        Serial.println("[WARN] BluetoothManager initialization failed!");
+    } else {
+        Serial.println("[Boot] ✅ BluetoothManager initialized");
+    }
 }
 
 // ============================================================================
@@ -178,7 +188,47 @@ void loop() {
     static unsigned long lastTelemetry = 0;
     if (now - lastTelemetry >= Config::TelemetryRateMsec) {
         Pose p = pose.getPenPose();
-        comms.broadcastTelemetry(p.x, p.y, nav.getNavData().heading, battery.getVoltage());
+        
+        // Construction du paquet de télémétrie complet
+        TelemetryPacket telem;
+        
+        // Pose du robot (stylo)
+        telem.robotX = p.x;
+        telem.robotY = p.y;
+        telem.robotHeading = nav.getNavData().heading; // Cap fusionné en degrés
+
+        // DEFENSE: "À quoi servent les données 'Ghost' ?"
+        // ANSWER: À quantifier l'apport de l'IMU. On compare la position estimée par les roues 
+        // seules (Ghost) à la position fusionnée pour détecter les dérives odométriques.        
+        Pose ghost = pose.getGhostPose();
+        telem.ghostX = ghost.x;
+        telem.ghostY = ghost.y;
+        telem.ghostHeading = ghost.theta * (180.0f / M_PI);
+
+        // Moteurs
+        telem.leftWheelSpeed = 0; // Non implémenté dans DriveTrain.cpp
+        telem.rightWheelSpeed = 0;
+        telem.leftWheelSteps = leftMotor.getTicks();
+        telem.rightWheelSteps = rightMotor.getTicks();
+
+        // IMU (données brutes)
+        ImuData rawImu = nav.getRawData();
+        telem.accelX = rawImu.accelX; telem.accelY = rawImu.accelY; telem.accelZ = rawImu.accelZ;
+        telem.gyroX = rawImu.gyroX; telem.gyroY = rawImu.gyroY; telem.gyroZ = rawImu.gyroZ;
+        telem.magX = rawImu.magX; telem.magY = rawImu.magY; telem.magZ = rawImu.magZ;
+
+        // Autres
+        telem.batteryVoltage = battery.getVoltage();
+        telem.isMoving = !motion.isReached(); 
+        telem.isCalibrated = nav.isCalibrated();
+        telem.waypointIndex = 0; 
+        // Les cibles X, Y et le bearingToTarget peuvent être ajoutés si MotionController les expose
+        telem.targetX = 0; telem.targetY = 0; telem.bearingToTarget = 0;
+
+        // Envoi de la télémétrie via WebSocket (CommsManager)
+        comms.broadcastTelemetry(telem);
+        // Envoi de la télémétrie via BLE (BluetoothManager)
+        ble.sendTelemetry(telem);
         lastTelemetry = now;
     }
 

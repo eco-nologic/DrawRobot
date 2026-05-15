@@ -1,11 +1,17 @@
 #include "Navigation.h"
 #include <Wire.h>
+#include <math.h> // Pour M_PI, cos, sin, atan2, sqrt
 
 /**
  * @brief Initialise les capteurs LSM6DS3 et LIS3MDL sur le bus I2C.
  * DEFENSE: "Quels protocoles sont utilisés pour communiquer avec les capteurs ?"
  * ANSWER: Le protocole I2C (Inter-Integrated Circuit) via les broches SDA(21) et SCL(22).
  */
+Navigation::Navigation() {
+    memset(&rawData, 0, sizeof(ImuData));
+    memset(&orientation, 0, sizeof(OrientationData));
+}
+
 bool Navigation::begin() {
     delay(200); 
     
@@ -15,28 +21,51 @@ bool Navigation::begin() {
     
     /**
      * DEFENSE: "Comment détectez-vous une panne capteur ?"
-     * ANSWER: La méthode begin_I2C() vérifie le registre WHO_AM_I des capteurs. 
+     * ANSWER: La méthode begin_I2C() vérifie le registre WHO_AM_I des capteurs.
      * Si le bus est déconnecté ou parasité par les moteurs, le robot signale l'erreur immédiatement.
      */
-    bool lsmOk = false, lisOk = false;
-    for (int retry = 0; retry < 3 && (!lsmOk || !lisOk); retry++) {
-        if (!lsmOk) {
-            lsmOk = _lsm.begin_I2C(Config::AddrLsm6ds);
-            if (!lsmOk) lsmOk = _lsm.begin_I2C(0x6B); // Try alternate address if primary fails
+    // DEFENSE: "Comment gérez-vous les variations d'adresses I2C du matériel ?"
+    // ANSWER: Nous utilisons une logique de scan sur les deux adresses standards (0x6A/0x6B et 0x1C/0x1E).
+    // Cela permet au firmware d'être compatible avec différentes révisions de cartes électroniques.
+
+    // 1. Détection du LSM6DS3 (Accéléromètre / Gyroscope)
+    bool lsmFound = false;
+    uint8_t lsmAddrs[] = {Config::AddrLsm6ds, 0x6B}; 
+    for (uint8_t addr : lsmAddrs) {
+        if (_lsm.begin_I2C(addr, &Wire)) {
+            Serial.printf("[Nav] ✅ LSM6DS3 trouvé à l'adresse 0x%02X\n", addr);
+            lsmFound = true;
+            break;
         }
-        if (!lisOk) lisOk = _lis.begin_I2C(Config::AddrLis3mdl);
-        if (!lsmOk || !lisOk) {
-            Serial.printf("[Nav] Init retry %d/3...\n", retry + 1);
-            delay(500); // Longer delay between retries
-        }
+        delay(10);
     }
 
-    if (!lsmOk || !lisOk) {
-        Serial.println("[Nav] ERROR: I2C Sensors failed to initialize after retries.");
-        return false; 
+    if (!lsmFound) {
+        Serial.println("[Nav] ❌ Erreur critique : LSM6DS3 introuvable sur le bus I2C.");
+        return false;
+    }
+    
+    delay(100); // Temps de stabilisation accru
+
+    // 2. Détection du LIS3MDL (Magnétomètre)
+    bool lisFound = false;
+    uint8_t lisAddrs[] = {Config::AddrLis3mdl, 0x1C};
+    for (uint8_t addr : lisAddrs) {
+        if (_lis.begin_I2C(addr, &Wire)) {
+            Serial.printf("[Nav] ✅ LIS3MDL trouvé à l'adresse 0x%02X\n", addr);
+            lisFound = true;
+            break;
+        }
+        delay(10);
+    }
+
+    if (!lisFound) {
+        Serial.println("[Nav] ❌ Erreur critique : LIS3MDL introuvable sur le bus I2C.");
+        return false;
     }
 
     Serial.println("[Nav] Sensors initialized successfully.");
+    Serial.println("[Nav] ✅ LSM6DS3 & LIS3MDL hardware initialized");
 
     // On lance la calibration du gyroscope au démarrage
     calibrate();
@@ -45,43 +74,58 @@ bool Navigation::begin() {
     _data.gyroZ = 0;
     _data.isCalibrated = false;
     _lastUpdate = millis();
+    _headingIntegral = 0; // Initialisation de l'intégrale du cap
     return true;
 }
 
 void Navigation::calibrate() {
     // DEFENSE: "Pourquoi le robot doit-il rester immobile pendant le démarrage ?"
     // ANSWER: La fonction calibrate() calcule la moyenne de 200 échantillons du gyroscope. 
-    // Si le robot bouge, le biais calculé sera faux, entraînant une dérive constante du cap.
-    Serial.println("[Nav] ⚖️ Calibration Gyro... NE PAS BOUGER");
-    float sumZ = 0, sumSqZ = 0;
-    const int samples = 200;
+    // Nous bouclons maintenant jusqu'à obtenir un écart-type < 0.015, garantissant une stabilité parfaite.
+    
+    bool isStable = false;
+    while (!isStable) {
+        Serial.println("[Nav] ⚖️ Calibration Gyroscope... NE PAS BOUGER");
+        float sumZ = 0, sumSqZ = 0;
+        const int samples = 200;
 
-    for (int i = 0; i < samples; i++) {
-        sensors_event_t accel, gyro, temp;
-        _lsm.getEvent(&accel, &gyro, &temp);
-        float val = gyro.gyro.z;
-        sumZ += val;
-        sumSqZ += val * val; 
-        if (i % 20 == 0) Serial.print(".");
-        delay(5);
+        for (int i = 0; i < samples; i++) {
+            sensors_event_t accel, gyro, temp;
+            _lsm.getEvent(&accel, &gyro, &temp);
+            float val = gyro.gyro.z;
+            sumZ += val;
+            sumSqZ += val * val; 
+            if (i % 20 == 0) Serial.print(".");
+            delay(5);
+        }
+
+        float mean = sumZ / samples;
+        // MATH: Variance = E[X^2] - (E[X])^2.
+        float variance = (sumSqZ / samples) - (mean * mean);
+        float stdDev = sqrt(fmax(0.0f, variance));
+
+        if (stdDev < 0.015f) { // Seuil de stabilité strict
+            _gyroBiasZ = mean;
+            Serial.printf("\n[Nav] ✅ Stabilité atteinte. Biais: %.4f rad/s (StdDev: %.4f)\n", _gyroBiasZ, stdDev);
+            isStable = true;
+        } else {
+            Serial.printf("\n[Nav] ⚠️ Instable (StdDev: %.4f). Nouvel essai dans 1s...\n", stdDev);
+            delay(1000);
+        }
     }
 
-    float mean = sumZ / samples;
-    // MATH: Variance = E[X^2] - (E[X])^2 (Formule de Koenig-Huygens)
-    // L'écart-type permet de vérifier statistiquement si le robot était bien immobile.
-    float stdDev = sqrt(max(0.0f, (sumSqZ / samples) - (mean * mean)));
-
-    if (stdDev > 0.02f) {
-        Serial.printf("\n[Nav] ❌ ÉCHEC: Mouvement détecté (StdDev: %.4f)\n", stdDev);
-        _gyroBiasZ = 0;
-    } else {
-        _gyroBiasZ = mean;
-        Serial.printf("\n[Nav] ✅ Prêt. Biais: %.4f rad/s (StdDev: %.4f)\n", _gyroBiasZ, stdDev);
-    }
+    // MATH: On force l'initialisation de l'intégrale à 0 pour que update() déclenche 
+    // l'alignement immédiat sur le magnétomètre au premier cycle.
+    _headingIntegral = 0; 
+    _lastUpdate = 0;
 }
 
 /**
  * @brief Lit et fusionne les données brutes des capteurs.
+ * DEFENSE: "Comment le robot obtient-il son orientation ?"
+ * ANSWER: En lisant les données brutes de l'accéléromètre, du gyroscope et du magnétomètre,
+ * puis en les fusionnant via un filtre complémentaire pour obtenir un cap stable et réactif.
+ * Les données brutes sont stockées dans `rawData` et l'orientation fusionnée dans `orientation`.
  */
 void Navigation::update() {
     unsigned long now = millis();
@@ -89,62 +133,115 @@ void Navigation::update() {
     if (dt < 0.001f) return; 
     _lastUpdate = now;
 
-    sensors_event_t accel, gyro, temp, mag;
-    _lsm.getEvent(&accel, &gyro, &temp);
-    _lis.getEvent(&mag);
+    // Lecture des données brutes des capteurs
+    sensors_event_t accelEvent, gyroEvent, tempEvent, magEvent;
+    _lsm.getEvent(&accelEvent, &gyroEvent, &tempEvent);
+    _lis.getEvent(&magEvent);
 
-    // 1. Tilt Compensation (Compensation d'inclinaison)
-    // DEFENSE: "Comment gérez-vous l'inclinaison du robot ?"
-    // ANSWER: On utilise l'accéléromètre pour calculer le Roll et le Pitch afin de projeter
-    // le vecteur magnétique sur le plan horizontal (Xh, Yh).
-    float roll = atan2(accel.acceleration.y, accel.acceleration.z);
-    float pitch = atan2(-accel.acceleration.x, sqrt(accel.acceleration.y * accel.acceleration.y + accel.acceleration.z * accel.acceleration.z));
+    /**
+     * DEFENSE: "Pourquoi remappez-vous les axes des capteurs ?"
+     * ANSWER: Selon le plan mécanique (travail.txt), l'axe longitudinal (avant) du robot est Y.
+     * Nous convertissons les données du capteur (qui a sa propre orientation) vers le repère du robot
+     * (X=Avant, Y=Gauche, Z=Haut) pour que les algorithmes de navigation standard fonctionnent.
+     */
+    // Remap axes: Sensor Y -> Robot X (Forward), Sensor -X -> Robot Y (Left), Sensor Z -> Robot Z (Up)
+    rawData.accelX = accelEvent.acceleration.y;
+    rawData.accelY = -accelEvent.acceleration.x;
+    rawData.accelZ = accelEvent.acceleration.z;
+    
+    rawData.gyroX = gyroEvent.gyro.y;
+    rawData.gyroY = -gyroEvent.gyro.x;
+    rawData.gyroZ = gyroEvent.gyro.z; // L'axe Z du gyro est souvent déjà aligné avec l'axe de rotation vertical du robot
 
-    float mx = mag.magnetic.x - _magOffsetX;
-    float my = mag.magnetic.y - _magOffsetY;
-    float mz = mag.magnetic.z;
+    rawData.magX = magEvent.magnetic.y;
+    rawData.magY = -magEvent.magnetic.x;
+    rawData.magZ = magEvent.magnetic.z;
 
+    // Appliquer les offsets Hard-Iron (calculés via analyze_imu.py)
+    float correctedMagX = rawData.magX - _magOffsetX;
+    float correctedMagY = rawData.magY - _magOffsetY;
+    float correctedMagZ = rawData.magZ - _magOffsetZ; // Si un offset Z est nécessaire
+
+    // La calibration du magnétomètre (Hard-Iron) se fait en arrière-plan
+    // pendant la séquence de calibration (rotation du robot).
+    // Les valeurs min/max sont utilisées pour calculer les offsets.
     if (_isCalibrating) {
-        if (mx < _magMinX) _magMinX = mx; if (mx > _magMaxX) _magMaxX = mx;
-        if (my < _magMinY) _magMinY = my; if (my > _magMaxY) _magMaxY = my;
+        if (correctedMagX < _magMinX) _magMinX = correctedMagX; if (correctedMagX > _magMaxX) _magMaxX = correctedMagX;
+        if (correctedMagY < _magMinY) _magMinY = correctedMagY; if (correctedMagY > _magMaxY) _magMaxY = correctedMagY;
     }
 
-    // MATH: Matrice de rotation inverse pour horizontaliser les mesures magnétiques.
-    float Xh = mx * cos(pitch) + mz * sin(pitch);
-    float Yh = mx * sin(roll) * sin(pitch) + my * cos(roll) - mz * sin(roll) * cos(pitch);
+    // 1. Calcul de l'assiette (Roll/Pitch) pour la compensation d'inclinaison
+    // DEFENSE: "Comment gérez-vous l'inclinaison du robot pour le cap ?"
+    // ANSWER: On utilise l'accéléromètre pour calculer le Roll et le Pitch.
+    // Ces angles sont ensuite utilisés pour projeter le vecteur magnétique sur le plan horizontal.
+    // MATH: Roll = atan2(Ay, Az), Pitch = atan2(-Ax, sqrt(Ay^2 + Az^2))
+    orientation.roll = atan2(rawData.accelY, rawData.accelZ);
+    orientation.pitch = atan2(-rawData.accelX, sqrt(rawData.accelY * rawData.accelY + rawData.accelZ * rawData.accelZ));
 
+    // MATH: Matrice de rotation inverse pour horizontaliser les mesures magnétiques (Xh, Yh)
+    // Cela évite que le cap ne "saute" lors des accélérations ou sur un sol incliné.
+    float Xh = correctedMagX * cos(orientation.pitch) + correctedMagZ * sin(orientation.pitch);
+    float Yh = correctedMagX * sin(orientation.roll) * sin(orientation.pitch) + correctedMagY * cos(orientation.roll) - correctedMagZ * sin(orientation.roll) * cos(orientation.pitch);
+
+    // Calcul du cap magnétique absolu
+    // MATH: atan2(-Yh, Xh) calcule l'angle polaire. On utilise -Yh car l'angle de navigation
+    // (Heading) augmente dans le sens horaire (convention robotique) alors que le cercle trigonométrique est anti-horaire.
     float magHeading = atan2(-Yh, Xh);
 
     // 2. Filtre Complémentaire (Fusion Gyro + Mag)
-    // DEFENSE: "Comment fusionnez-vous les données ?"
-    // ANSWER: Le gyro donne la réactivité immédiate et le mag corrige la dérive lente.
-    float gyroZRate = gyro.gyro.z - _gyroBiasZ;
-    float error = magHeading - _headingIntegral;
+    // DEFENSE: "Comment fusionnez-vous les données du gyroscope et du magnétomètre ?"
+    // ANSWER: Le gyroscope (rawData.gyroZ) donne la réactivité immédiate (haute fréquence) mais dérive.
+    // Le magnétomètre (magHeading) est stable à long terme (basse fréquence) mais bruité.
+    // Le filtre complémentaire combine les deux : Angle = Angle + (Gyro + Kp * Erreur_Mag) * dt.
+    float gyroZRate = rawData.gyroZ - _gyroBiasZ; // Soustraire le biais du gyroscope
+    float headingError = magHeading - _headingIntegral;
 
-    // MATH: Normalisation de l'erreur entre [-PI, PI]
-    while (error > PI) error -= 2.0f * PI;
-    while (error < -PI) error += 2.0f * PI;
+    // MATH: Normalisation de l'erreur entre [-PI, PI] pour éviter les problèmes
+    // de discontinuité (ex: passer de 179° à -179°).
+    while (headingError > M_PI) headingError -= 2.0f * M_PI;
+    while (headingError < -M_PI) headingError += 2.0f * M_PI;
 
-    _headingIntegral += (gyroZRate + 0.05f * error) * dt;
+    // MATH: Intégration temporelle du gyroscope avec correction du magnétomètre.
+    // Le gain 0.05f est la constante de temps du filtre : il définit la vitesse de correction.
+    
+    // DEFENSE: "Pourquoi le cap monte-t-il tout seul au démarrage ?"
+    // ANSWER: Au premier cycle, on initialise l'intégrale directement sur le magnétomètre 
+    // pour éviter la phase de convergence lente (20s) du filtre complémentaire.
+    if (_lastUpdate == 0 || _headingIntegral == 0) {
+        _headingIntegral = magHeading;
+    } else {
+        _headingIntegral += (gyroZRate + 0.05f * headingError) * dt;
+    }
+    
+    // Wrap final de l'angle cumulé pour le maintenir dans l'intervalle [-PI, PI]
+    while (_headingIntegral > M_PI) _headingIntegral -= 2.0f * M_PI;
+    while (_headingIntegral < -M_PI) _headingIntegral += 2.0f * M_PI;
 
-    // Wrap final
-    while (_headingIntegral > PI) _headingIntegral -= 2.0f * PI;
-    while (_headingIntegral < -PI) _headingIntegral += 2.0f * PI;
-
-    _data.gyroZ = gyroZRate;
-    _data.heading = _headingIntegral * 180.0f / PI; 
+    // Mise à jour des données de navigation fusionnées
+    _data.gyroZ = gyroZRate; // Vitesse de rotation corrigée
+    _data.heading = _headingIntegral * (180.0f / M_PI); // Cap en degrés (0-360)
     if (_data.heading < 0) _data.heading += 360.0f;
 }
 
 void Navigation::startCalibration() {
-    _magMinX = _magMinY = 1000.0f;
-    _magMaxX = _magMaxY = -1000.0f;
+    // Initialise les valeurs min/max pour la calibration Hard-Iron du magnétomètre
+    _magMinX = 1000.0f; _magMaxX = -1000.0f;
+    _magMinY = 1000.0f; _magMaxY = -1000.0f;
     _isCalibrating = true;
     _data.isCalibrated = false;
+    Serial.println("[Nav] Démarrage calibration magnétomètre (rotation 360° requise).");
 }
 
 void Navigation::stopCalibration() {
     _isCalibrating = false;
-    _data.isCalibrated = true; 
-    Serial.println("[Nav] Magnetometer Calibration finalized.");
+    _data.isCalibrated = true;
+    // Calcul des offsets finaux
+    _magOffsetX = (_magMaxX + _magMinX) / 2.0f;
+    _magOffsetY = (_magMaxY + _magMinY) / 2.0f;
+    Serial.printf("[Nav] Calibration magnétomètre terminée. Offsets X:%.2f, Y:%.2f\n", _magOffsetX, _magOffsetY);
+}
+
+bool Navigation::isCalibrated() const {
+    // Le magnétomètre est considéré calibré si les offsets ont été calculés
+    return _data.isCalibrated;
 }

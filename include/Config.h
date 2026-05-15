@@ -14,7 +14,7 @@ namespace Config {
     #endif
 
     // Firmware
-    constexpr char FirmwareVersion[] = "1.1.8";
+    constexpr char FirmwareVersion[] = "1.2.22";
 
     // Physical Parameters
     // DEFENSE: "Comment déterminez-vous la distance parcourue par tick ?"
