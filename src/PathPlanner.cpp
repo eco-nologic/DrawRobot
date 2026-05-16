@@ -59,6 +59,10 @@ void PathPlanner::startBalance() {
     _currentSequence = new BalanceSequence();
 }
 
+bool PathPlanner::isBalancing() const {
+    return _currentSequence && _currentSequence->isBalance();
+}
+
 void PathPlanner::update(float dt) {
     if (!_currentSequence) return; 
 

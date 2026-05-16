@@ -38,6 +38,12 @@ bool navReady = false;
 void setupWifi() {
     Serial.println("[WiFi] Starting WiFi Access Point...");
     
+    // DEFENSE: "Pourquoi désactiver le WiFi Sleep mode ?"
+    // ANSWER: Sur batterie, les variations de tension dues aux moteurs peuvent faire 
+    // décrocher la radio si elle entre en mode économie d'énergie. En forçant 
+    // WiFi.setSleep(false), on stabilise la latence et la robustesse du lien WebSocket.
+    WiFi.setSleep(false);
+
     WiFi.mode(WIFI_AP);
     WiFi.softAP(WifiSsid, WifiPassword);
     WiFi.softAPConfig(
@@ -262,7 +268,14 @@ void loop() {
 
     // 4. Telemetry broadcast
     static unsigned long lastTelemetry = 0;
-    if (now - lastTelemetry >= Config::TelemetryRateMsec) {
+
+    // DEFENSE: "Pourquoi la télémétrie est-elle ralentie en mode Segway ?"
+    // ANSWER: Pour garantir la priorité maximale à la boucle d'équilibre (100Hz). 
+    // En mode normal, on envoie à 10Hz. En mode Segway, on réduit à 1Hz pour éviter que 
+    // les interruptions WiFi/BLE ne créent des micro-retards fatals à la stabilité.
+    unsigned long telemetryInterval = planner.isBalancing() ? 1000 : Config::TelemetryRateMsec;
+
+    if (now - lastTelemetry >= telemetryInterval) {
         Pose p = pose.getPenPose();
         
         // Construction du paquet de télémétrie complet

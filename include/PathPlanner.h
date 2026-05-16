@@ -45,6 +45,9 @@ public:
     // Démarre le mode équilibriste (Easter Egg)
     void startBalance();
 
+    // Indique si le robot est en train de chercher son équilibre
+    bool isBalancing() const;
+
     // Accesseurs pour la télémétrie
     float getTargetL() const;
     float getTargetTheta() const;

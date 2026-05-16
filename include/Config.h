@@ -14,7 +14,7 @@ namespace Config {
     #endif
 
     // Firmware
-    constexpr char FirmwareVersion[] = "1.2.51";
+nC    constexpr char FirmwareVersion[] = "1.2.61";
 
     // Physical Parameters
     // DEFENSE: "Comment déterminez-vous la distance parcourue par tick ?"
@@ -108,6 +108,14 @@ namespace Config {
     // atan2(accelZ, accelX) devrait être 0 quand le robot est debout (accelZ=0, accelX=9.81).
     constexpr float BalancePointRad = 0.0f; // Angle cible pour le Pitch (0 = vertical)
 
+    // --- Kalman Filter Parameters for Balance (Easter Egg) ---
+    // DEFENSE: "Comment le filtre de Kalman rend-il l'équilibre plus stable ?"
+    // ANSWER: Il modélise l'incertitude du capteur et du processus.
+    // Q_angle: Bruit du processus (intégration du gyro), Q_bias: Bruit du biais du gyro.
+    // R_measure: Bruit de la mesure (accéléromètre).
+    constexpr float KalmanQAngle = 0.001f; // Bruit du processus sur l'angle
+    constexpr float KalmanQBias = 0.003f;  // Bruit du processus sur le biais du gyroscope
+    constexpr float KalmanRMeasure = 0.03f; // Bruit de la mesure (accéléromètre)
     // Timing
     constexpr int LoopRateMsec = 10;
     // DEFENSE: "Pourquoi avoir réduit la fréquence de la télémétrie ?"

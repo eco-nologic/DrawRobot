@@ -11,6 +11,11 @@ public:
     virtual bool isFinished() const = 0;
     virtual void onFinished(Navigation& nav) {} // Hook pour le nettoyage final
 
+    /**
+     * @brief Permet d'identifier le mode équilibre pour optimiser les ressources.
+     */
+    virtual bool isBalance() const { return false; }
+
     // MATH: Accesseurs pour les valeurs théoriques demandées par travail.pdf
     virtual float getTargetL() const { return 0.0f; }
     virtual float getTargetTheta() const { return 0.0f; }
