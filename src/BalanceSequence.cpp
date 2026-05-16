@@ -27,6 +27,7 @@ void BalanceSequence::update(MotionController& mc, Navigation& nav) {
         _calibrationStartTime = millis();
         _tiltSum = 0;
         _tiltSamples = 0;
+        _lastSpeed = 0;
         _isCalibrating = true;
         Serial.println("[Segway] 🤝 Apprentissage : Tenez le robot parfaitement vertical...");
     }
@@ -69,18 +70,18 @@ void BalanceSequence::update(MotionController& mc, Navigation& nav) {
     float output = _pidBalance.compute(tiltError, 0, 0.01f); 
 
     /**
-     * MATH: On réduit le multiplicateur de vitesse (80 au lieu de 120) pour rendre 
-     * le robot moins "nerveux" et permettre un cruise plus fluide ("slowly").
+     * MATH/DEFENSE: "Comment éviter les secousses (shocks) près de la verticale ?"
+     * ANSWER: En normalisant la vitesse entre -1.0 et 1.0. Précédemment, les valeurs 
+     * saturaient immédiatement le DriveTrain. En utilisant un gain de 0.6, le PID 
+     * peut enfin commander des vitesses lentes et fluides ("slowly") près de 0.
      */
-    float speed = output * 80.0f; 
+    float speed = output * 0.6f; 
 
-    // Saturation et gestion de la zone morte (Deadband)
-    speed = constrain(speed, -80.0f, 80.0f);
+    // Saturation normalisée pour DriveTrain::setVelocity (-1.0 à 1.0)
+    speed = constrain(speed, -1.0f, 1.0f);
 
-    // Deadband boost réduit pour un cruise plus doux près de la verticale.
-    if (abs(speed) > 0.1f && abs(speed) < 10.0f) {
-        speed = (speed > 0) ? 10.0f : -10.0f;
-    }
+    // On retire le boost binaire qui provoquait l'effet de choc.
+    // La linéarité du PID et le DEADBAND de Config.h gèrent désormais la friction.
 
     /**
      * DEFENSE: "Comment le robot garde-t-il l'équilibre ?"

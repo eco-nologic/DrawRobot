@@ -17,7 +17,19 @@ public:
     }
 };
 
-BluetoothManager::BluetoothManager() : isConnected(false), _isInitialized(false) {}
+// Callbacks pour gérer la réception de commandes (WRITE)
+class MyCharacteristicCallbacks : public BLECharacteristicCallbacks {
+    BluetoothManager* _manager;
+public:
+    MyCharacteristicCallbacks(BluetoothManager* manager) : _manager(manager) {}
+    void onWrite(BLECharacteristic* pCharacteristic) {
+        std::string rxValue = pCharacteristic->getValue();
+        _manager->processIncomingCommand((uint8_t*)rxValue.c_str(), rxValue.length());
+    }
+};
+
+BluetoothManager::BluetoothManager(CommandHandler& handler) 
+    : isConnected(false), _isInitialized(false), _commandHandler(handler) {}
 
 bool BluetoothManager::begin() {
     Serial.println("[BLE] Initialisation du service BLE...");
@@ -34,10 +46,12 @@ bool BluetoothManager::begin() {
 
         pCharacteristic = pService->createCharacteristic(
             CHARACTERISTIC_UUID,
-            BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+            BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_WRITE
         );
         
         if (!pCharacteristic) return false;
+
+        pCharacteristic->setCallbacks(new MyCharacteristicCallbacks(this));
 
         pCharacteristic->addDescriptor(new BLE2902());
         pService->start();
@@ -64,13 +78,14 @@ void BluetoothManager::sendTelemetry(const TelemetryPacket& packet) {
 
     char buffer[256];
     snprintf(buffer, sizeof(buffer), 
-             "A:%.2f,%.2f,%.2f|G:%.2f,%.2f,%.2f|M:%.2f,%.2f,%.2f|H:%.2f|B:%.2f|T:%lu|Lth:%.1f|Ath:%.1f|Rth:%.1f",
+             "A:%.2f,%.2f,%.2f|G:%.2f,%.2f,%.2f|M:%.2f,%.2f,%.2f|H:%.2f|B:%.2f|T:%lu|X:%.1f|Y:%.1f|Lth:%.1f|Ath:%.1f|Rth:%.1f",
              packet.accelX, packet.accelY, packet.accelZ,
              packet.gyroX, packet.gyroY, packet.gyroZ,
              packet.magX, packet.magY, packet.magZ,
              packet.robotHeading,
              packet.batteryVoltage,
              millis(),
+             packet.robotX, packet.robotY,
              packet.targetL, packet.targetTheta, packet.targetR);
 
     if (pCharacteristic != nullptr) {
@@ -81,8 +96,11 @@ void BluetoothManager::sendTelemetry(const TelemetryPacket& packet) {
 }
 
 void BluetoothManager::processIncomingCommand(const uint8_t* data, size_t length) {
-    // Réservé pour les futures commandes distantes via BLE
-    Serial.printf("[BLE] Commande reçue (%d octets)\n", length);
+    // DEFENSE: "Comment le BLE communique avec le reste du robot ?"
+    // ANSWER: Les octets reçus sont transmis au CommandHandler central. 
+    // Ce dernier désérialise le JSON et exécute la logique de mouvement.
+    // On utilise const_cast car CommandHandler attend un pointeur modifiable pour ArduinoJson
+    _commandHandler.processJSONCommand(const_cast<uint8_t*>(data), length);
 }
 
 void BluetoothManager::stop() {

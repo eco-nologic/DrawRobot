@@ -80,7 +80,7 @@ async def run_ble_client():
                 try:
                     decoded_data = data.decode('utf-8')
                     # DEFENSE: "Quel est le format de la trame Bluetooth ?"
-                    # ANSWER: Une chaîne formatée (A:...|G:...|M:...|H:...|B:...|T:...|Lth:...|Ath:...|Rth:...) 
+                    # ANSWER: Une chaîne formatée (A:...|G:...|M:...|H:...|B:...|T:...|X:...|Y:...|Lth:...|Ath:...|Rth:...) 
                     # pour minimiser la bande passante par rapport au JSON tout en restant lisible.
                     parts = decoded_data.split('|')
                     
@@ -91,12 +91,15 @@ async def run_ble_client():
                     heading = float(parts[3].split(':')[1])
                     battery_v = float(parts[4].split(':')[1])
                     timestamp_ms = int(parts[5].split(':')[1])
+                    # Position réelle
+                    robot_x = float(parts[6].split(':')[1])
+                    robot_y = float(parts[7].split(':')[1])
                     # Nouveaux champs pour la validation travail.pdf
-                    target_l = float(parts[6].split(':')[1])
-                    target_theta = float(parts[7].split(':')[1])
-                    target_r = float(parts[8].split(':')[1])
+                    target_l = float(parts[8].split(':')[1])
+                    target_theta = float(parts[9].split(':')[1])
+                    target_r = float(parts[10].split(':')[1])
 
-                    row = [timestamp_ms, 0.0, 0.0, heading, battery_v] + accel_data + gyro_data + mag_data + [target_l, target_theta, target_r]
+                    row = [timestamp_ms, robot_x, robot_y, heading, battery_v] + accel_data + gyro_data + mag_data + [target_l, target_theta, target_r]
                     csv_writer.writerow(row)
                     points_count += 1
                     

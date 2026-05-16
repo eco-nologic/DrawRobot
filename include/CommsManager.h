@@ -4,8 +4,8 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
-#include "PathPlanner.h"
 #include "TelemetryPacket.h"
+#include "CommandHandler.h"
 
 /**
  * DEFENSE: "Pourquoi utiliser des WebSockets et du JSON ?"
@@ -14,7 +14,7 @@
  */
 class CommsManager {
 public:
-    CommsManager(PathPlanner& planner);
+    CommsManager(CommandHandler& handler);
 
     void begin();
     
@@ -24,7 +24,7 @@ public:
 private:
     AsyncWebServer _server;
     AsyncWebSocket _ws;
-    PathPlanner& _planner;
+    CommandHandler& _commandHandler;
 
     void onEvent(AsyncWebSocket* s, AsyncWebSocketClient* c, AwsEventType t, void* arg, uint8_t* data, size_t len);
 };

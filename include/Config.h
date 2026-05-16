@@ -14,7 +14,7 @@ namespace Config {
     #endif
 
     // Firmware
-nC    constexpr char FirmwareVersion[] = "1.2.61";
+    constexpr char FirmwareVersion[] = "1.2.70";
 
     // Physical Parameters
     // DEFENSE: "Comment déterminez-vous la distance parcourue par tick ?"
@@ -77,6 +77,9 @@ nC    constexpr char FirmwareVersion[] = "1.2.61";
     // WiFi
     constexpr const char* WifiSsid = "RobotWifi";
     constexpr const char* WifiPassword = "penbot123";
+    constexpr uint8_t WifiApIp[4] = {192, 168, 4, 1};
+    constexpr uint8_t WifiGateway[4] = {192, 168, 4, 1};
+    constexpr uint8_t WifiSubnet[4] = {255, 255, 255, 0};
 
     // Planner & Shapes
     constexpr int CIRCLE_STEPS = 36;

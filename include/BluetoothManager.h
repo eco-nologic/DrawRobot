@@ -7,6 +7,7 @@
 #include <BLE2902.h>
 #include "Config.h"
 #include "TelemetryPacket.h" // Inclusion de la structure TelemetryPacket
+#include "CommandHandler.h"
 
 /**
  * @class BluetoothManager
@@ -14,7 +15,7 @@
  */
 class BluetoothManager {
 public:
-    BluetoothManager();
+    BluetoothManager(CommandHandler& handler);
 
     // DEFENSE: "Pourquoi utiliser le Bluetooth en plus du WiFi ?"
     // ANSWER: Pour disposer d'un canal de données indépendant. Si le WiFi sature lors de l'envoi 
@@ -42,6 +43,7 @@ public:
 private:
     BLEServer* pServer = nullptr;
     BLECharacteristic* pCharacteristic = nullptr;
+    CommandHandler& _commandHandler;
     bool _isInitialized = false; // Flag pour vérifier si BLE a été activé avec succès
     unsigned long lastPacketTime;
 

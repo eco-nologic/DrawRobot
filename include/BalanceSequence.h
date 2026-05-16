@@ -20,6 +20,7 @@ private:
     float _tiltSum = 0.0f;
     int _tiltSamples = 0;
     float _learnedOffset = 0.0f;
+    float _lastSpeed = 0.0f; // Pour le lissage de sortie
 };
 
 #endif
